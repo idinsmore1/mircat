@@ -7,15 +7,23 @@ requires-python = ">=3.10,<3.12"
 dependencies = [
     "loguru>=0.7.2",
     "nibabel>=5.2.1",
-    "numpy==1.26.4",
+    "numpy==1.26",
+    "scipy==1.13.1",
+    "threadpoolctl>=3.5.0",
+    "mircat-seg",
+    "mircat-stats"
 ]
 
 [project.scripts]
-hello = "mircat:hello"
+mircat = "mircat:mircat"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.uv.sources]
+mircat-seg = { workspace = true }
+mircat-stats = { workspace = true }
+
 [tool.uv.workspace]
-members = ["packages/mircat_stats", "packages/mircat_seg"]
+members = ["packages/mircat-seg", "packages/mircat-stats"]

@@ -1,2 +1,2 @@
-def hello():
+def mircat():
     print("Hello from mircat!")

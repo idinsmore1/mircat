@@ -5,8 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 dependencies = [
+    "cloud-files==4.24.2",
+    "cloud-volume==8.33.0",
     "dicom2nifti>=2.5.0",
     "kimimaro==4.0.0",
+    "pydicom==2.4.4",
     "scikit-image>=0.24.0",
     "scikit-learn>=1.5.2",
     "simpleitk==2.3.1",
@@ -14,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-hello = "mircat_stats:hello"
+mircat-stats = "mircat_stats:mircat_stats"
 
 [build-system]
 requires = ["hatchling"]
