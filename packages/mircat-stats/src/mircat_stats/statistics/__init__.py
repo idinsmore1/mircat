@@ -19,7 +19,7 @@ from .contrast_detection import predict_contrast as predict_contrast
 from mircat_stats.configs import set_num_threads
 
 
-def main(
+def calculate_nifti_stats(
     nifti_files: list[str],
     task_list: list[str],
     num_workers: int,

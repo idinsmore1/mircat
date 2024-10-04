@@ -1,7 +1,7 @@
 [project]
 name = "mircat-seg"
 version = "0.1.0"
-description = "Add your description here"
+description = "Segmentation library for Mirshahi CT Analysis Toolkit (MirCAT)."
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 dependencies = [
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mircat-seg = "mircat_seg:mircat_seg"
+mircat-copy-models = "mircat_seg:mircat_copy_models"
 
 [build-system]
 requires = ["hatchling"]

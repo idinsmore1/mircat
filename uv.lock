@@ -1366,10 +1366,15 @@ dependencies = [
     { name = "cloud-volume" },
     { name = "dicom2nifti" },
     { name = "kimimaro" },
+    { name = "loguru" },
+    { name = "nibabel" },
+    { name = "numpy" },
     { name = "pydicom" },
     { name = "scikit-image" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "simpleitk" },
+    { name = "threadpoolctl" },
     { name = "xgboost" },
 ]
 
@@ -1379,10 +1384,15 @@ requires-dist = [
     { name = "cloud-volume", specifier = "==8.33.0" },
     { name = "dicom2nifti", specifier = ">=2.5.0" },
     { name = "kimimaro", specifier = "==4.0.0" },
+    { name = "loguru", specifier = ">=0.7.2" },
+    { name = "nibabel", specifier = ">=5.2.1" },
+    { name = "numpy", specifier = "==1.26" },
     { name = "pydicom", specifier = "==2.4.4" },
     { name = "scikit-image", specifier = ">=0.24.0" },
     { name = "scikit-learn", specifier = ">=1.5.2" },
+    { name = "scipy", specifier = "==1.13.1" },
     { name = "simpleitk", specifier = "==2.3.1" },
+    { name = "threadpoolctl", specifier = ">=3.5.0" },
     { name = "xgboost", specifier = "==2.1.0" },
 ]
 
@@ -1526,7 +1536,7 @@ name = "nvidia-cudnn-cu12"
 version = "8.9.2.26"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "platform_machine != 'loongarch64' or platform_python_implementation != 'CPython' or sys_platform == 'win32' or python_full_version >= '3.11'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ff/74/a2e2be7fb83aaedec84f391f082cf765dfb635e7caa9b49065f73e4835d8/nvidia_cudnn_cu12-8.9.2.26-py3-none-manylinux1_x86_64.whl", hash = "sha256:5ccb288774fdfb07a7e7025ffec286971c06d8d7b4fb162525334616d7629ff9", size = 731725872 },
@@ -1553,9 +1563,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.4.5.107"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
-    { name = "nvidia-cusparse-cu12" },
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "platform_machine != 'loongarch64' or platform_python_implementation != 'CPython' or sys_platform == 'win32' or python_full_version >= '3.11'" },
+    { name = "nvidia-cusparse-cu12", marker = "platform_machine != 'loongarch64' or platform_python_implementation != 'CPython' or sys_platform == 'win32' or python_full_version >= '3.11'" },
+    { name = "nvidia-nvjitlink-cu12", marker = "platform_machine != 'loongarch64' or platform_python_implementation != 'CPython' or sys_platform == 'win32' or python_full_version >= '3.11'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/1d/8de1e5c67099015c834315e333911273a8c6aaba78923dd1d1e25fc5f217/nvidia_cusolver_cu12-11.4.5.107-py3-none-manylinux1_x86_64.whl", hash = "sha256:8a7ec542f0412294b15072fa7dab71d31334014a69f953004ea7a118206fe0dd", size = 124161928 },
@@ -1566,7 +1576,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.1.0.106"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "platform_machine != 'loongarch64' or platform_python_implementation != 'CPython' or sys_platform == 'win32' or python_full_version >= '3.11'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/65/5b/cfaeebf25cd9fdec14338ccb16f6b2c4c7fa9163aefcf057d86b9cc248bb/nvidia_cusparse_cu12-12.1.0.106-py3-none-manylinux1_x86_64.whl", hash = "sha256:f3b50f42cf363f86ab21f720998517a659a48131e8d538dc02f8768237bd884c", size = 195958278 },
@@ -2425,7 +2435,7 @@ name = "triton"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", marker = "platform_machine != 'loongarch64' or platform_python_implementation != 'CPython' or sys_platform == 'win32' or python_full_version >= '3.11'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/69/8a9fde07d2d27a90e16488cdfe9878e985a247b2496a4b5b1a2126042528/triton-2.3.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3c84595cbe5e546b1b290d2a58b1494df5a2ef066dd890655e5b8a8a92205c33", size = 168055249 },

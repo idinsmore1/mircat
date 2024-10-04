@@ -2,8 +2,8 @@ import argparse
 from pathlib import Path
 from mircat_stats.configs.logging import configure_logging, get_project_root
 from threadpoolctl import threadpool_limits
-# from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
-# from mircat_stats.statistics import main as calculate_nifti_stats
+from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
+from mircat_stats.statistics import calculate_nifti_stats
 import shutil
 
 
@@ -32,6 +32,9 @@ def mircat_stats():
     )
     convert_parser.add_argument(
         "-nm", "--no-mip", help="Do not convert likely mip series", action="store_true"
+    )
+    convert_parser.add_argument(
+        "-th", "--threads", help="Number of threads for each worker", type=int, default=1
     )
     # Set up stats parser
     stats_parser = subparsers.add_parser(
@@ -85,9 +88,11 @@ def mircat_stats():
     update_parser.add_argument(
         "-n", "--num-workers", help="Number of workers", type=int, default=1
     )
+    update_parser.add_argument("-th", "--threads", help="Number of threads", type=int, default=1)
 
     args = parser.parse_args()
     args.verbose = not args.quiet
+    threadpool_limits(limits=args.threads)
     if args.command == "convert":
         if args.dicoms.is_dir():
             logfile = "./nifti_conversion_log.json"
@@ -117,42 +122,20 @@ def mircat_stats():
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
         configure_logging(logfile, args.verbose)
-        with threadpool_limits(limits=args.threads):
-            from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
-            from mircat_stats.statistics import main as calculate_nifti_stats        
-            if args.command == "stats":
-                calculate_nifti_stats(
-                    nifti_list,
-                    args.task_list,
-                    args.num_workers,
-                    args.threads,
-                    args.mark_complete,
-                    args.gaussian
-                )
-            elif args.command == "update":
-                update(nifti_list, args.num_workers)
-            else:
-                print("Unknown command")
-
-
-def copy_models():
-    parser = argparse.ArgumentParser(description="Copy models to the correct location")
-    parser.add_argument(
-        "model_dir", help="Directory containing models to copy", type=Path
-    )
-    args = parser.parse_args()
-    model_dir = args.model_dir
-    if not model_dir.is_dir():
-        raise ValueError("Model directory does not exist")
-    project_root = get_project_root()
-    destination_dir = project_root / "models"
-
-    if not destination_dir.exists():
-        destination_dir.mkdir(parents=True)
-
-    for model_file in model_dir.iterdir():
-        if model_file.is_file():
-            shutil.copy(model_file, destination_dir)
-    print(f"Models copied to {destination_dir}")
+    
+        if args.command == "stats":
+            
+            calculate_nifti_stats(
+                nifti_list,
+                args.task_list,
+                args.num_workers,
+                args.threads,
+                args.mark_complete,
+                args.gaussian
+            )
+        elif args.command == "update":
+            update(nifti_list, args.num_workers)
+        else:
+            print("Unknown command")
 
 

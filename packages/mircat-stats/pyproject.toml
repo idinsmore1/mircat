@@ -1,10 +1,15 @@
 [project]
 name = "mircat-stats"
 version = "0.1.0"
-description = "Add your description here"
+description = "Mirshahi CT Analysis Toolkit (MirCAT), stats and dicom conversion only. Convert and Quantify CT NIfTI files."
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 dependencies = [
+    "loguru>=0.7.2",
+    "nibabel>=5.2.1",
+    "numpy==1.26",
+    "scipy==1.13.1",
+    "threadpoolctl>=3.5.0",
     "cloud-files==4.24.2",
     "cloud-volume==8.33.0",
     "dicom2nifti>=2.5.0",
