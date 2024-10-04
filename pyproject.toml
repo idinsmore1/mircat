@@ -1,0 +1,21 @@
+[project]
+name = "mircat"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "loguru>=0.7.2",
+    "nibabel>=5.2.1",
+    "numpy==1.26.4",
+]
+
+[project.scripts]
+hello = "mircat:hello"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = ["packages/mircat_stats", "packages/mircat_seg"]

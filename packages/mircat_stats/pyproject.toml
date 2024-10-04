@@ -1,0 +1,21 @@
+[project]
+name = "mircat-stats"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "dicom2nifti>=2.5.0",
+    "kimimaro==4.0.0",
+    "scikit-image>=0.24.0",
+    "scikit-learn>=1.5.2",
+    "simpleitk==2.3.1",
+    "xgboost==2.1.0",
+]
+
+[project.scripts]
+hello = "mircat_stats:hello"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
