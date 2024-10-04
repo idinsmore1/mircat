@@ -1,8 +1,9 @@
 import argparse
 from pathlib import Path
 from mircat_stats.configs.logging import configure_logging, get_project_root
-from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
-from mircat_stats.statistics import main as calculate_nifti_stats
+from threadpoolctl import threadpool_limits
+# from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
+# from mircat_stats.statistics import main as calculate_nifti_stats
 import shutil
 
 
@@ -116,19 +117,22 @@ def mircat_stats():
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
         configure_logging(logfile, args.verbose)
-        if args.command == "stats":
-            calculate_nifti_stats(
-                nifti_list,
-                args.task_list,
-                args.num_workers,
-                args.threads,
-                args.mark_complete,
-                args.gaussian
-            )
-        elif args.command == "update":
-            update(nifti_list, args.num_workers)
-        else:
-            print("Unknown command")
+        with threadpool_limits(limits=args.threads):
+            from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
+            from mircat_stats.statistics import main as calculate_nifti_stats        
+            if args.command == "stats":
+                calculate_nifti_stats(
+                    nifti_list,
+                    args.task_list,
+                    args.num_workers,
+                    args.threads,
+                    args.mark_complete,
+                    args.gaussian
+                )
+            elif args.command == "update":
+                update(nifti_list, args.num_workers)
+            else:
+                print("Unknown command")
 
 
 def copy_models():
