@@ -1,13 +1,13 @@
 """
-This file contains the implementation of the NiftiMircato class, which represents a folder of NIfTI files output from MirCATo and keeps state and meta information.
+This file contains the implementation of the NiftiMircat class, which represents a folder of NIfTI files output from MirCATo and keeps state and meta information.
 
-The NiftiMircato class provides methods for setting up the metadata for the NIfTI file, checking if it is valid for specific tasks, loading the original CT and segmentation arrays, and loading statistics.
+The NiftiMircat class provides methods for setting up the metadata for the NIfTI file, checking if it is valid for specific tasks, loading the original CT and segmentation arrays, and loading statistics.
 
 Classes:
 - BodySegNotFoundError: Raised when the body segmentation file is not found.
 - TotalSegNotFoundError: Raised when the total segmentation file is not found.
 - TissuesSegNotFoundError: Raised when the tissues segmentation file is not found.
-- NiftiMircato: A class to represent a folder of NIfTI files output from MirCATo and keep state information.
+- NiftiMircat: A class to represent a folder of NIfTI files output from MirCATo and keep state information.
 
 Functions:
 - resample_nifti_sitk: Load and resample a NIfTI file using SimpleITK.
@@ -45,7 +45,7 @@ class TissuesSegNotFoundError(FileNotFoundError):
     pass
 
 
-class NiftiMircato:
+class NiftiMircao:
     """
     A class to represent a folder of NIfTI files output from MirCATo and keep state information.
     """
@@ -166,7 +166,7 @@ class NiftiMircato:
             self.tissues_seg = resample_nifti_sitk(
                 self.seg_files["tissues"], resample_spacing, is_label=True, gaussian=gaussian
             )
-        # Check if the sizes and spacings are consistent
+        # Check if the sizes and spacings are consistent - need to fix this for checking only what stats are being ran
         if (
             self.original_ct.GetSize() != self.total_seg.GetSize()
             or self.original_ct.GetSize() != self.body_seg.GetSize()
