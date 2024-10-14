@@ -1,13 +1,14 @@
-FROM ubuntu:jammy
+FROM ghcr.io/astral-sh/uv:bookworm-slim
 
-COPY --from=ghcr.io/astral-sh/uv:0.4.18 /uv /bin/uv
+# COPY --from=ghcr.io/astral-sh/uv:0.4.18 /uv /bin/uv
 
-# Change the working directory to the `app` directory
+# Update the OS
 RUN apt-get update && \
     apt-get install -y clang gcc g++ python3-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Change the working directory to the `app` directory
 WORKDIR /app
 
 # Install dependencies
@@ -20,6 +21,6 @@ WORKDIR /app
 ADD . /app
 
 # Sync the project
-RUN uv -v sync -p 3.10 --no-cache
+RUN uv sync --compile-bytecode
 
 ENTRYPOINT ["uv", "run", "mircat-stats"]

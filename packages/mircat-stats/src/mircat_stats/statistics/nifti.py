@@ -45,7 +45,7 @@ class TissuesSegNotFoundError(FileNotFoundError):
     pass
 
 
-class NiftiMircao:
+class NiftiMircato:
     """
     A class to represent a folder of NIfTI files output from MirCATo and keep state information.
     """
@@ -155,10 +155,13 @@ class NiftiMircao:
         self.original_ct = resample_nifti_sitk(
             self.path, resample_spacing, is_label=False, gaussian=gaussian
         )
+        original_size = self.original_ct.GetSize()
         if needs_total:
             self.total_seg = resample_nifti_sitk(
                 self.seg_files["total"], resample_spacing, is_label=True, gaussian=gaussian
             )
+            if original_size != self.total_seg.GetSize():
+                raise ValueError("Size of total segmentation is not consistent with original ct.")
         if needs_tissues:
             self.body_seg = resample_nifti_sitk(
                 self.seg_files["body"], resample_spacing, is_label=True, gaussian=gaussian
@@ -166,17 +169,10 @@ class NiftiMircao:
             self.tissues_seg = resample_nifti_sitk(
                 self.seg_files["tissues"], resample_spacing, is_label=True, gaussian=gaussian
             )
-        # Check if the sizes and spacings are consistent - need to fix this for checking only what stats are being ran
-        if (
-            self.original_ct.GetSize() != self.total_seg.GetSize()
-            or self.original_ct.GetSize() != self.body_seg.GetSize()
-            or self.original_ct.GetSize() != self.tissues_seg.GetSize()
-            or self.original_ct.GetSpacing() != self.total_seg.GetSpacing()
-            or self.original_ct.GetSpacing() != self.body_seg.GetSpacing()
-            or self.original_ct.GetSpacing() != self.tissues_seg.GetSpacing()
-        ):
-            raise ValueError("Sizes and spacings of NIfTI arrays are not consistent")
-
+            if original_size != self.body_seg.GetSize():
+                raise ValueError("Size of body segmentation is not consistent with original ct.")
+            if original_size != self.tissues_seg.GetSize():
+                raise ValueError("Size of tissues segmentation is not consistent with original ct.")
     def _load_stats(self) -> None:
         try:
             with self.output_file.open("r") as f:
