@@ -113,5 +113,20 @@ options:
   -g, --gaussian        Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling
 ```
 
+### Update
+This command is usually not needed. Only needs to be used to update the format of the NiFTi `header_info.json` file when the `mircat` version changes.
+```
+usage: mircat update [-h] [-n NUM_WORKERS] [-th THREADS] niftis
+
+positional arguments:
+  niftis                Path to NIfTI files
+
+options:
+  -h, --help            show this help message and exit
+  -n NUM_WORKERS, --num-workers NUM_WORKERS
+                        Number of workers
+  -th THREADS, --threads THREADS
+                        Number of threads
+```
 
 
