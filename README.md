@@ -39,13 +39,15 @@ options:
 ```
 For python
 ```bash
+# From the command line
 mircat -h
 # Same output
+mircat-copy-models input_dir  # This will copy model weights to the proper directory. 
 ```
 Currently the four commands are `convert`, `segment`, `stats` and `update`.
 
 ### Convert
-This command allows you to convert DICOM series to into NiFTi files. It uses the `multiprocessing` module for parallelization.
+This command allows you to convert DICOM series to into NiFTi files. It uses the `multiprocessing` module for parallelization. The converted NiFTi files will be stored in subfolders in `output_dir` corresponding to their unique DICOM identifiers. 
 ```markdown
 usage: mircat convert [-h] [-n NUM_WORKERS] [-ax] [-nm] [-th THREADS] dicoms output_dir
 
@@ -64,8 +66,9 @@ options:
 ```
 
 ### Segment
-This command allows you to segment structrues from NiFTi files. You can specify what tasks you want to run with the `--tasks` flag. TO see the list of outputs for each of the tasks, look at the config file in 
-in `packages/mircat-stats/src/mircat_stats/configs/models.py`. Default is to run segemntation on the GPU.  
+This command allows you to segment structrues from NiFTi files. You can specify what tasks you want to run with the `--tasks` flag. To see the list of outputs for each of the tasks, look at the config file in 
+in `packages/mircat-stats/src/mircat_stats/configs/models.py`. Default is to run segmentation on the GPU. If you would like the model weights for these operations please email me at **irdinsmore1@geisinger.edu**. The docker image will already come with them by default.  
+If you install with python, you can use `mircat-copy-models` to copy the directory where you store the model weights to the proper library location. 
 
 All segmentations will be stored in a folder next to the give input NiFTi files. For example if I run `segment niftis/ex_nifti.nii.gz`, the output will be stored in `niftis/ex_nifti_segs/ex_nifti_taskname.nii.gz`.
 ```markdown
@@ -93,7 +96,15 @@ options:
 ### Stats
 This command allows you to calculate statistics from the segmented nifti files. 
 It is recommended to give the same input file that you gave to segment once it has been completed. 
-If you only want the output from a specific segmentation task, make sure to pass the `-t` flag to the `stats` command.
+If you only want the output from a specific segmentation task, make sure to pass the `-t` flag to the `stats` command.  
+This command will output a statistics `json` file in the segmentations directory. So if you input `example_nifti.nii.gz`, then the output will be in `example_nifti_segs/example_nifti_stats.json`. The output will be ordered in the listed order in `packages/mircat-stats/src/mircat_stats/configs/statistics.py` if all tasks are ran or `--mark-complete` flag is used.  
+
+The possible tasks to be passed to `--task-list` are `total`, `contrast`, `aorta`, and `tissues`.
+- `total` will give you the total volume and average intensities for all structures segmented from the `total` segmentation task.
+- `contrast` will used a pretrained model to predict the presence of contrast within the CT.
+- `aorta` will measure the maximum, middle, and proximal diameters of the ascending, arch, descending and abdominal regions of the aorta using a centerline (if they exist in the image).
+- `tissues` will measure the total volume and average intensities for the adipose tissues and skeletal muscle from the `tissues` segmentation task as well as the areas at the L1, L3, and L5 vertebral levels.
+  - It will also measure body circumference and area at those vertebral levels.
 
 ```markdown
 usage: mircat stats [-h] [-t TASK_LIST [TASK_LIST ...]] [-n NUM_WORKERS] [-th THREADS] [-mc] [-g] niftis
@@ -113,5 +124,20 @@ options:
   -g, --gaussian        Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling
 ```
 
+### Update
+This command is usually not needed. Only needs to be used to update the format of the NiFTi `header_info.json` file when the `mircat` version changes.
+```
+usage: mircat update [-h] [-n NUM_WORKERS] [-th THREADS] niftis
+
+positional arguments:
+  niftis                Path to NIfTI files
+
+options:
+  -h, --help            show this help message and exit
+  -n NUM_WORKERS, --num-workers NUM_WORKERS
+                        Number of workers
+  -th THREADS, --threads THREADS
+                        Number of threads
+```
 
 
