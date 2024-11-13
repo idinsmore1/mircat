@@ -173,6 +173,7 @@ class NiftiMircato:
                 raise ValueError("Size of body segmentation is not consistent with original ct.")
             if original_size != self.tissues_seg.GetSize():
                 raise ValueError("Size of tissues segmentation is not consistent with original ct.")
+    
     def _load_stats(self) -> None:
         try:
             with self.output_file.open("r") as f:

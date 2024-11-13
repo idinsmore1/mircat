@@ -1,6 +1,6 @@
 [project]
 name = "mircat-seg"
-version = "0.1.1"
+version = "0.1.2"
 description = "Segmentation library for Mirshahi CT Analysis Toolkit (MirCAT)."
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
