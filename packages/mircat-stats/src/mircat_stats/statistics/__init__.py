@@ -7,7 +7,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
 
-from .nifti import NiftiMircato as NiftiMircato
+from .nifti import MircatNifti as MircatNifti
 from .nifti import TotalSegNotFoundError, BodySegNotFoundError, TissuesSegNotFoundError
 from .aorta import calculate_aorta_stats as calculate_aorta_stats
 from .total import calculate_total_segmentation_stats as calculate_total_stats
@@ -82,7 +82,7 @@ def single_nifti_stats(
         Whether to apply a gaussian smoothing to the image
     """
     try:
-        nifti = NiftiMircato(input_nifti)
+        nifti = MircatNifti(input_nifti)
         nifti.setup(task_list, gaussian)
 
         # Set up the default values

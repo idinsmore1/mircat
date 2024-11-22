@@ -2,18 +2,18 @@ import numpy as np
 
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import timer
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.statistics.utils import _calc_intensity_stats, _calc_shape_stats
 
 
 @timer
 def calculate_total_segmentation_stats(
-    nifti: NiftiMircato,
+    nifti: MircatNifti,
 ) -> tuple[dict[str:float], dict[str:int]]:
     """Calculate the statistics for the total segmentation
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to calculate statistics for
     Returns
     -------

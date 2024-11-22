@@ -45,9 +45,9 @@ class TissuesSegNotFoundError(FileNotFoundError):
     pass
 
 
-class NiftiMircato:
+class MircatNifti:
     """
-    A class to represent a folder of NIfTI files output from MirCATo and keep state information.
+    A class to represent a folder of NIfTI files used by MirCAT for statistics.
     """
 
     task_labels = ["total", "tissues", "body"]
