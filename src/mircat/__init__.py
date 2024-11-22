@@ -180,7 +180,6 @@ def mircat():
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
         configure_logging(logger, logfile, args.verbose)
-        print(logger)
         if args.command == "segment":
             segment_niftis(
                 nifti_list,

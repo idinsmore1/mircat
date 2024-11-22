@@ -49,7 +49,6 @@ def configure_logging(logger, log_file_path, verbose: bool):
     # Remove all handlers
     logger.remove()
     # Log all logs except INFO to a file
-    print(f'{verbose=}')
     logger.add(
         log_file_path,
         format=formatter,
