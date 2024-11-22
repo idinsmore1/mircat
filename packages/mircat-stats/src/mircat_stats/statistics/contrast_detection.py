@@ -1,7 +1,6 @@
 """Contrast detection based on the Comp2Comp model with our segmentations"""
 
 import os
-import pickle
 import numpy as np
 import scipy
 import SimpleITK as sitk
@@ -133,10 +132,6 @@ def predict_contrast(nifti: MircatNifti) -> dict[str : str | str : float]:
 
 def _load_model():
     model_path = os.path.join(get_project_root(), "models/xgboost.json")
-    # with catch_warnings():
-    #     filterwarnings("ignore")
-    # with open(model_path, "rb") as f:
-    #     model = pickle.load(f)
     model = XGBClassifier()
     model.load_model(model_path)
     return model

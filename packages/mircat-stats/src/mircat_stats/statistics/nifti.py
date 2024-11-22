@@ -28,7 +28,6 @@ class BodySegNotFoundError(FileNotFoundError):
     """
     Raised when the body segmentation file is not found
     """
-
     pass
 
 
@@ -36,7 +35,6 @@ class TotalSegNotFoundError(FileNotFoundError):
     """
     Raised when the total segmentation file is not found
     """
-
     pass
 
 
@@ -44,7 +42,6 @@ class TissuesSegNotFoundError(FileNotFoundError):
     """
     Raised when the tissues segmentation file is not found
     """
-
     pass
 
 
@@ -238,11 +235,11 @@ class MircatNifti:
         if self.stats_exist:
             existing_stats = self.stats
             existing_stats.update(output_stats)
-            output_stats = existing_stats
+            output_stats = existing_stats.copy()
         if all_completed:
             flag_file = str(self.output_file).replace("_stats.json", ".complete")
             Path(flag_file).touch()
-            output_stats = {k: output_stats.get(k) for k in stats_output_keys}
+        output_stats = {k: output_stats.get(k) for k in stats_output_keys}
         with self.output_file.open("w") as f:
             json.dump(output_stats, f, indent=4)
 
