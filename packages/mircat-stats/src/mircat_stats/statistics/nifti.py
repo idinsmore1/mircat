@@ -90,8 +90,7 @@ class MircatNifti:
             for task in self.task_labels
         }
         if self.output_file.exists():
-            # self._load_stats()
-            self.vert_midlines = {}
+            self._load_stats()
         else:
             self.stats_exist = False
             self.vert_midlines = {}
@@ -99,6 +98,7 @@ class MircatNifti:
         self._check_seg_files(task_list)
         self._load_seg_arrays(task_list, gaussian)
         self._check_and_load_header()
+        # Calculate the vertebral midlines as reference points in the segmentations
         if self.vert_midlines == {}:
             self._get_vertebra_midlines(gaussian)
 
@@ -190,6 +190,11 @@ class MircatNifti:
             self.vert_midlines = {
                 k: v for k, v in vert_midlines.items() if v is not None
             }
+            if self.vert_midlines.get('vertebrae_T12L1_midline') is None:
+                if self.vert_midlines.get('vertebrae_L1_midline') is not None and self.vert_midlines.get('vertebrae_T12_midline') is not None:
+                    self.vert_midlines["vertebrae_T12L1_midline"] = int(
+                        (self.vert_midlines["vertebrae_L1_midline"] + self.vert_midlines["vertebrae_T12_midline"]) / 2
+                    )
             self.stats_exist = True
 
         except json.decoder.JSONDecodeError:

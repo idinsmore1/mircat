@@ -5,9 +5,7 @@ from mircat_stats.statistics.utils import _calculate_3d_volumes, _calculate_2d_a
 
 
 @timer
-def calculate_body_and_tissues_stats(
-    nifti: MircatNifti, vert_midlines: dict
-) -> dict[str:float]:
+def calculate_body_and_tissues_stats(nifti: MircatNifti) -> dict[str:float]:
     """Calculate the body and tissue statistics
     Parameters
     ----------
@@ -20,6 +18,7 @@ def calculate_body_and_tissues_stats(
     dict
         The statistics for the body and tissues
     """
+    vert_midlines = nifti.vert_midlines
     body_map = torch_model_configs["body"]["output_map"]
     tissues_map = torch_model_configs["tissues"]["output_map"]
     # Set the segmentations

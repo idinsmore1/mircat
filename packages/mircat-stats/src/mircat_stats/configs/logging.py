@@ -4,8 +4,6 @@ import json
 from time import time
 from pathlib import Path
 
-from loguru import logger
-
 
 # Quick timing wrapper
 def timer(func):
@@ -47,14 +45,15 @@ def formatter(record):
     return "{extra[serialized]}\n"
 
 
-def configure_logging(log_file_path, verbose: bool):
+def configure_logging(logger, log_file_path, verbose: bool):
     # Remove all handlers
     logger.remove()
     # Log all logs except INFO to a file
+    print(f'{verbose=}')
     logger.add(
         log_file_path,
         format=formatter,
-        # serialize=True,
+        serialize=True,
         level="DEBUG",
         rotation="10 GB",
         compression="gz",
@@ -66,7 +65,7 @@ def configure_logging(log_file_path, verbose: bool):
         # Print INFO and SUCCESS logs to stdout and WARNING, ERROR, and CRITICAL to stderr
         logger.add(
             sys.stdout,
-            colorize=True,
+            # colorize=True,
             format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> <level>{message}</level>",
             level="INFO",
             filter=lambda record: record["level"].name in ["INFO", "SUCCESS"],
@@ -74,7 +73,7 @@ def configure_logging(log_file_path, verbose: bool):
         )
         logger.add(
             sys.stderr,
-            colorize=True,
+            # colorize=True,
             format="<red>{time: DD-MM-YYYY -> HH:mm:ss}</red> <level>{message}</level>",
             level="WARNING",
             filter=lambda record: record["level"].name
@@ -85,10 +84,9 @@ def configure_logging(log_file_path, verbose: bool):
         # Only print INFO logs to stdout
         logger.add(
             sys.stdout,
-            colorize=True,
+            # colorize=True,
             format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> <level>{message}</level>",
             level="INFO",
             filter=lambda record: record["level"].name == "INFO",
             enqueue=True,
         )
-    # Always print WARNING, ERROR, and CRITICAL to stderr

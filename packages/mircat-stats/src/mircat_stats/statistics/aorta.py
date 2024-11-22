@@ -21,9 +21,14 @@ from mircat_stats.statistics.cpr import (
 AORTA_CROSS_SECTION_SPACING = (1, 1)
 ROOT_LENGTH = 10
 
+class AortaSegNotFoundError(ValueError):
+    """
+    Raised when the aorta segmentation is not found
+    """
+    pass
 
 @timer
-def calculate_aorta_stats(nifti: MircatNifti, vert_midlines: dict) -> dict:
+def calculate_aorta_stats(nifti: MircatNifti) -> dict:
     """Calculate the statistics for the aorta
     Parameters
     ----------
@@ -37,9 +42,10 @@ def calculate_aorta_stats(nifti: MircatNifti, vert_midlines: dict) -> dict:
         The statistics for the aorta
     """
     aorta_stats = {}
+    vert_midlines: dict = nifti.vert_midlines
     # These are all the possible vertebral regions of the aorta. Scans will have some subset of these
     region_vert_map = {
-        "abdominal": ["S1", *[f"L{i}" for i in range(1, 6)]],
+        "abdominal": ["S1", *[f"L{i}" for i in range(1, 6)], 'T12L1'],
         "thoracic": [f"T{i}" for i in range(1, 13)],
         "descending": [f"T{i}" for i in range(5, 13)],
     }
@@ -58,6 +64,9 @@ def calculate_aorta_stats(nifti: MircatNifti, vert_midlines: dict) -> dict:
         find_region_endpoints = partial(
             _find_aortic_region_endpoints, vert_midlines=vert_midlines
         )
+    except AortaSegNotFoundError as e:
+        logger.opt(exception=True).error("No aorta found in segmentation")
+        return aorta_stats
     except Exception as e:
         logger.error(f"Error filtering to aorta segmentation: {e}")
         return aorta_stats
@@ -194,6 +203,8 @@ def _filter_to_aorta_seg(total_seg: sitk.Image) -> sitk.Image:
     for label, new_label in label_map.items():
         aorta[aorta == label] = new_label
     mapped_indices = [int(x) for x in np.unique(aorta)]
+    if 1 not in mapped_indices:
+        raise AortaSegNotFoundError("No aorta found in segmentation")
     # Convert back to sitk image
     aorta_mapped = sitk.GetImageFromArray(aorta)
     aorta_mapped.CopyInformation(total_seg)
