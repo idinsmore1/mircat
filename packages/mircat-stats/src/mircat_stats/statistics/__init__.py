@@ -84,7 +84,6 @@ def single_nifti_stats(
     try:
         nifti = MircatNifti(input_nifti)
         nifti.setup(task_list, gaussian)
-
         # Set up the default values
         header_data = nifti.header_data
         all_stats: dict = header_data

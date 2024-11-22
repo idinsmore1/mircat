@@ -17,8 +17,11 @@ import json
 import SimpleITK as sitk
 from pathlib import Path
 from loguru import logger
+from numpy import median
 
 from mircat_stats.configs.statistics import stats_output_keys, midline_keys
+from mircat_stats.configs.models import torch_model_configs
+from mircat_stats.statistics.utils import _calc_shape_stats
 
 
 class BodySegNotFoundError(FileNotFoundError):
@@ -86,14 +89,18 @@ class MircatNifti:
             task: self.seg_folder / f"{self.nifti_name}_{task}.nii.gz"
             for task in self.task_labels
         }
-        self._check_seg_files(task_list)
-        self._load_nifti_arrays(task_list, gaussian)
-        self._check_and_load_header()
         if self.output_file.exists():
-            self._load_stats()
+            # self._load_stats()
+            self.vert_midlines = {}
         else:
             self.stats_exist = False
             self.vert_midlines = {}
+        self._load_original_ct()
+        self._check_seg_files(task_list)
+        self._load_seg_arrays(task_list, gaussian)
+        self._check_and_load_header()
+        if self.vert_midlines == {}:
+            self._get_vertebra_midlines(gaussian)
 
     def _check_and_load_header(self) -> None:
         if self.header_file.exists():
@@ -118,15 +125,12 @@ class MircatNifti:
         task_list: list[str]
             A list of tasks to check for
         """
-        needs_total = any(
-            [task in ["total", "aorta", "contrast"] for task in task_list]
-        )
+        # Need total segmentation for vertebra midlines - if this doesn't exist it wont work
+        if not self.seg_files["total"].exists():
+            raise TotalSegNotFoundError(
+                f'Total segmentation file {self.seg_files["total"]} does not exist'
+            )
         needs_tissues = "tissues" in task_list
-        if needs_total:
-            if not self.seg_files["total"].exists():
-                raise TotalSegNotFoundError(
-                    f'Total segmentation file {self.seg_files["total"]} does not exist'
-                )
         if needs_tissues:
             if not self.seg_files["body"].exists():
                 raise BodySegNotFoundError(
@@ -137,7 +141,13 @@ class MircatNifti:
                     f'Tissues segmentation file {self.seg_files["tissues"]} does not exist'
                 )
 
-    def _load_nifti_arrays(self, task_list, gaussian: bool, resample_spacing=[1.0, 1.0, 1.0]) -> None:
+    def _load_original_ct(self, resample_spacing=[1.0, 1.0, 1.0], gaussian=False) -> None:
+        """Load in the original CT array"""
+        self.original_ct = resample_nifti_sitk(
+            self.path, resample_spacing, is_label=False, gaussian=gaussian
+        )
+    
+    def _load_seg_arrays(self, task_list, gaussian: bool, resample_spacing=[1.0, 1.0, 1.0]) -> None:
         """Load in the original CT and segmentation arrays
         Parameters
         ----------
@@ -152,9 +162,6 @@ class MircatNifti:
             [task in ["total", "aorta", "contrast"] for task in task_list]
         )
         needs_tissues = "tissues" in task_list
-        self.original_ct = resample_nifti_sitk(
-            self.path, resample_spacing, is_label=False, gaussian=gaussian
-        )
         original_size = self.original_ct.GetSize()
         if needs_total:
             self.total_seg = resample_nifti_sitk(
@@ -190,6 +197,29 @@ class MircatNifti:
             self.stats = {}
             self.stats_exist = False
             self.vert_midlines = {}
+
+    def _get_vertebra_midlines(self, gaussian: bool) -> None:
+        # Calculate the vertebral midlines
+        total_map = torch_model_configs["total"]["output_map"]
+        vert_midlines = {}
+        if getattr(self, "total_seg", False):
+            total_seg = self.total_seg
+        else:
+            self._load_seg_arrays(["total"], gaussian)
+            total_seg = self.total_seg
+        shape_stats = _calc_shape_stats(total_seg)
+        seg_labels = shape_stats.GetLabels()
+        vert_map = {k: v for k, v in total_map.items() if "vertebrae" in k}
+        for name, label in vert_map.items():
+            if label in seg_labels:
+                indices = shape_stats.GetIndexes(label)
+                z_indices = indices[2::3]
+                vert_midlines[f"{name}_midline"] = int(median(z_indices))
+        if "vertebrae_L1_midline" in vert_midlines and "vertebrae_T12_midline" in vert_midlines:
+            vert_midlines["vertebrae_T12L1_midline"] = int(
+                (vert_midlines["vertebrae_L1_midline"] + vert_midlines["vertebrae_T12_midline"]) / 2
+            )
+        self.vert_midlines = vert_midlines
 
     def write_stats_to_file(self, output_stats: dict, all_completed: bool) -> None:
         """Write the statistics to a JSON file

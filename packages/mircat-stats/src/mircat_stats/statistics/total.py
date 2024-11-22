@@ -24,7 +24,6 @@ def calculate_total_segmentation_stats(
     """
     # Set up the two output maps
     total_map = torch_model_configs["total"]["output_map"]
-    vert_map = {k: v for k, v in total_map.items() if "vertebrae" in k}
     # Calculate the stats for the total segmentation
     shape_stats = _calc_shape_stats(nifti.total_seg)
     intensity_stats = _calc_intensity_stats(nifti.original_ct, nifti.total_seg)
@@ -37,12 +36,4 @@ def calculate_total_segmentation_stats(
             intensity = round(intensity_stats.GetMean(label), 2)
             total_stats[f"{name}_volume_cm3"] = volume
             total_stats[f"{name}_average_intensity"] = intensity
-    # Calculate the vertebral midlines
-    vert_midlines = {}
-    for name, label in vert_map.items():
-        if label in seg_labels:
-            indices = shape_stats.GetIndexes(label)
-            z_indices = indices[2::3]
-            vert_midlines[f"{name}_midline"] = int(np.median(z_indices))
-
-    return total_stats, vert_midlines
+    return total_stats

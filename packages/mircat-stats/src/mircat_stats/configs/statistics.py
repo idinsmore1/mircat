@@ -172,6 +172,7 @@ stats_output_keys = [
     "iliac_vena_right_average_intensity",
     "vertebrae_S1_midline",
     *[f"vertebrae_L{i}_midline" for i in range(5, 0, -1)],
+    'vertebrae_T12L1_midline',  # This is a special case for between the T12 and L1 for determining abdominal aorta size
     *[f"vertebrae_T{i}_midline" for i in range(12, 0, -1)],
     *[f"vertebrae_C{i}_midline" for i in range(7, 0, -1)],
     *[f"asc_aorta_{diam}" for diam in diam_names],

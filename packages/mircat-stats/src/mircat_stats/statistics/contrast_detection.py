@@ -10,7 +10,7 @@ from xgboost import XGBClassifier
 
 from loguru import logger
 from warnings import filterwarnings, catch_warnings
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import get_project_root, timer
 
@@ -39,11 +39,11 @@ FEATURE_LIST = [
 
 
 @timer
-def predict_contrast(nifti: NiftiMircato) -> dict[str : str | str : float]:
+def predict_contrast(nifti: MircatNifti) -> dict[str : str | str : float]:
     """Predict contrast phase of an image using radiomics data
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to predict contrast for
     Returns
     -------

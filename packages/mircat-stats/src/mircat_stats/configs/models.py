@@ -102,7 +102,3 @@ for config in torch_model_configs.values():
     config["crop_threshold"] = (config["percentile_005"] - config["mean"]) / config[
         "std"
     ]
-
-nnunet_model_configs = {
-    # Fill in configs here later
-}

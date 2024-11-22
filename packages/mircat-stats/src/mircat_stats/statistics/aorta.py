@@ -6,7 +6,7 @@ from functools import partial
 
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import timer
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.statistics.utils import _filter_largest_components
 from mircat_stats.statistics.centerline import create_centerline
 from mircat_stats.statistics.cpr import (
@@ -23,11 +23,11 @@ ROOT_LENGTH = 10
 
 
 @timer
-def calculate_aorta_stats(nifti: NiftiMircato, vert_midlines: dict) -> dict:
+def calculate_aorta_stats(nifti: MircatNifti, vert_midlines: dict) -> dict:
     """Calculate the statistics for the aorta
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to calculate statistics for
     vert_midlines : dict
         The vertebral midlines

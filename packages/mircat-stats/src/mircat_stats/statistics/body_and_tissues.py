@@ -1,17 +1,17 @@
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import timer
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.statistics.utils import _calculate_3d_volumes, _calculate_2d_areas
 
 
 @timer
 def calculate_body_and_tissues_stats(
-    nifti: NiftiMircato, vert_midlines: dict
+    nifti: MircatNifti, vert_midlines: dict
 ) -> dict[str:float]:
     """Calculate the body and tissue statistics
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to calculate statistics for
     vert_midlines : dict
         The vertebral midlines
