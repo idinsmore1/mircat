@@ -1,3 +1,4 @@
+import traceback
 import SimpleITK as sitk
 import numpy as np
 
@@ -6,9 +7,10 @@ from functools import partial
 
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import timer
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.statistics.utils import _filter_largest_components
 from mircat_stats.statistics.centerline import create_centerline
+from mircat_stats.statistics.segmentation import Segmentation, SegNotFoundError
 from mircat_stats.statistics.cpr import (
     create_straightened_cpr,
     measure_largest_cpr_diameter,
@@ -23,11 +25,11 @@ ROOT_LENGTH = 10
 
 
 @timer
-def calculate_aorta_stats(nifti: NiftiMircato, vert_midlines: dict) -> dict:
+def calculate_aorta_stats(nifti: MircatNifti) -> dict:
     """Calculate the statistics for the aorta
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to calculate statistics for
     vert_midlines : dict
         The vertebral midlines
@@ -37,9 +39,10 @@ def calculate_aorta_stats(nifti: NiftiMircato, vert_midlines: dict) -> dict:
         The statistics for the aorta
     """
     aorta_stats = {}
+    vert_midlines: dict = nifti.vert_midlines
     # These are all the possible vertebral regions of the aorta. Scans will have some subset of these
     region_vert_map = {
-        "abdominal": ["S1", *[f"L{i}" for i in range(1, 6)]],
+        "abdominal": ["S1", *[f"L{i}" for i in range(1, 6)], 'T12L1'],
         "thoracic": [f"T{i}" for i in range(1, 13)],
         "descending": [f"T{i}" for i in range(5, 13)],
     }
@@ -53,12 +56,17 @@ def calculate_aorta_stats(nifti: NiftiMircato, vert_midlines: dict) -> dict:
     # Get stats for each region of the aorta
     img = nifti.original_ct
     try:
+        # seg = Segmentation(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"]).segmentation
         seg = _filter_to_aorta_seg(nifti.total_seg)
         measure_aorta_region = partial(_measure_aorta_region, img, seg)
         find_region_endpoints = partial(
             _find_aortic_region_endpoints, vert_midlines=vert_midlines
         )
+    except SegNotFoundError as e:
+        logger.opt(exception=True).error("No aorta found in segmentation")
+        return aorta_stats
     except Exception as e:
+        traceback.print_exc()
         logger.error(f"Error filtering to aorta segmentation: {e}")
         return aorta_stats
 
@@ -167,39 +175,41 @@ def _aorta_superior(arr: np.ndarray) -> np.ndarray:
     arr = np.flip(arr, 1)
     return arr
 
-
-def _filter_to_aorta_seg(total_seg: sitk.Image) -> sitk.Image:
-    """Transform the total segmentation to only include the aorta and arch defining segmentations
-    as well as perform morphological operations to properly orient the aorta
-    Parameters
-    ----------
-    total_seg : sitk.Image
-        The total segmentation
-    Returns
-    -------
-    sitk.Image
-        The aorta segmentation
-    """
-    output_map = torch_model_configs["total"]["output_map"]
-    labels = ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"]
-    label_incides = [output_map[label] for label in labels]
-    label_map = {
-        old_label: new_label
-        for new_label, old_label in enumerate(label_incides, start=1)
-    }
-    # Get the aorta segmentation
-    aorta = sitk.GetArrayFromImage(total_seg)
-    mask = np.isin(aorta, label_incides)
-    aorta[~mask] = 0
-    for label, new_label in label_map.items():
-        aorta[aorta == label] = new_label
-    mapped_indices = [int(x) for x in np.unique(aorta)]
-    # Convert back to sitk image
-    aorta_mapped = sitk.GetImageFromArray(aorta)
-    aorta_mapped.CopyInformation(total_seg)
-    # Remove erroneous segmentations
-    aorta_mapped = _filter_largest_components(aorta_mapped, mapped_indices)
-    return aorta_mapped
+## This function is now redundant with Segmentation class
+# def _filter_to_aorta_seg(total_seg: sitk.Image) -> sitk.Image:
+#     """Transform the total segmentation to only include the aorta and arch defining segmentations
+#     as well as perform morphological operations to properly orient the aorta
+#     Parameters
+#     ----------
+#     total_seg : sitk.Image
+#         The total segmentation
+#     Returns
+#     -------
+#     sitk.Image
+#         The aorta segmentation
+#     """
+#     output_map = torch_model_configs["total"]["output_map"]
+#     labels = ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"]
+#     label_incides = [output_map[label] for label in labels]
+#     label_map = {
+#         old_label: new_label
+#         for new_label, old_label in enumerate(label_incides, start=1)
+#     }
+#     # Get the aorta segmentation
+#     aorta = sitk.GetArrayFromImage(total_seg)
+#     mask = np.isin(aorta, label_incides)
+#     aorta[~mask] = 0
+#     for label, new_label in label_map.items():
+#         aorta[aorta == label] = new_label
+#     mapped_indices = [int(x) for x in np.unique(aorta)]
+#     if 1 not in mapped_indices:
+#         raise AortaSegNotFoundError("No aorta found in segmentation")
+#     # Convert back to sitk image
+#     aorta_mapped = sitk.GetImageFromArray(aorta)
+#     aorta_mapped.CopyInformation(total_seg)
+#     # Remove erroneous segmentations
+#     aorta_mapped = _filter_largest_components(aorta_mapped, mapped_indices)
+#     return aorta_mapped
 
 
 def _check_aorta_regions(vert_midlines: dict) -> tuple[bool, bool, bool]:

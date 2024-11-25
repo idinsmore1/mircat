@@ -1,6 +1,7 @@
 import argparse
 from threadpoolctl import threadpool_limits, ThreadpoolController
 from pathlib import Path
+from loguru import logger
 from mircat_seg import segment_niftis
 from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
 from mircat_stats.statistics import calculate_nifti_stats
@@ -158,7 +159,7 @@ def mircat():
             logfile = f'{args.dicoms.with_suffix("")}_conversion_log.json'
             with args.dicoms.open() as f:
                 dicom_list = f.read().splitlines()
-        configure_logging(logfile, args.verbose)
+        configure_logging(logger, logfile, args.verbose)
         convert_dicom_folders_to_nifti(
             dicom_list,
             args.output_dir,
@@ -178,7 +179,7 @@ def mircat():
             logfile = f"{args.niftis.with_suffix('')}_{args.command}_log.jsonl"
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
-        configure_logging(logfile, args.verbose)
+        configure_logging(logger, logfile, args.verbose)
         if args.command == "segment":
             segment_niftis(
                 nifti_list,

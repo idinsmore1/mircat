@@ -1,7 +1,6 @@
 """Contrast detection based on the Comp2Comp model with our segmentations"""
 
 import os
-import pickle
 import numpy as np
 import scipy
 import SimpleITK as sitk
@@ -10,7 +9,7 @@ from xgboost import XGBClassifier
 
 from loguru import logger
 from warnings import filterwarnings, catch_warnings
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import get_project_root, timer
 
@@ -39,11 +38,11 @@ FEATURE_LIST = [
 
 
 @timer
-def predict_contrast(nifti: NiftiMircato) -> dict[str : str | str : float]:
+def predict_contrast(nifti: MircatNifti) -> dict[str : str | str : float]:
     """Predict contrast phase of an image using radiomics data
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to predict contrast for
     Returns
     -------
@@ -133,10 +132,6 @@ def predict_contrast(nifti: NiftiMircato) -> dict[str : str | str : float]:
 
 def _load_model():
     model_path = os.path.join(get_project_root(), "models/xgboost.json")
-    # with catch_warnings():
-    #     filterwarnings("ignore")
-    # with open(model_path, "rb") as f:
-    #     model = pickle.load(f)
     model = XGBClassifier()
     model.load_model(model_path)
     return model

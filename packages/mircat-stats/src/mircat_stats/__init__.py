@@ -1,4 +1,5 @@
 import argparse
+from loguru import logger
 from pathlib import Path
 from mircat_stats.configs.logging import configure_logging, get_project_root
 from threadpoolctl import threadpool_limits
@@ -93,6 +94,7 @@ def mircat_stats():
     args = parser.parse_args()
     args.verbose = not args.quiet
     threadpool_limits(limits=args.threads)
+
     if args.command == "convert":
         if args.dicoms.is_dir():
             logfile = "./nifti_conversion_log.json"
@@ -101,7 +103,7 @@ def mircat_stats():
             logfile = f'{args.dicoms.with_suffix("")}_conversion_log.json'
             with args.dicoms.open() as f:
                 dicom_list = f.read().splitlines()
-        configure_logging(logfile, args.verbose)
+        configure_logging(logger, logfile, args.verbose)
         convert_dicom_folders_to_nifti(
             dicom_list,
             args.output_dir,
@@ -110,6 +112,7 @@ def mircat_stats():
             args.no_mip,
             args.verbose,
         )
+
     elif args.command == "stats" or args.command == "update":
         # If the input to the niftis argument is just a singular nifti file, make it a list and log in the same dir
         if args.niftis.suffixes == [".nii", ".gz"] or args.niftis.suffix == ".nii":
@@ -121,10 +124,9 @@ def mircat_stats():
             logfile = f"{args.niftis.with_suffix('')}_{args.command}_log.jsonl"
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
-        configure_logging(logfile, args.verbose)
+        configure_logging(logger, logfile, args.verbose)
     
         if args.command == "stats":
-            
             calculate_nifti_stats(
                 nifti_list,
                 args.task_list,

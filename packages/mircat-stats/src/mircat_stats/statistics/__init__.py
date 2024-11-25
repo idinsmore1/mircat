@@ -7,7 +7,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
 
-from .nifti import NiftiMircato as NiftiMircato
+from .nifti import MircatNifti as MircatNifti
 from .nifti import TotalSegNotFoundError, BodySegNotFoundError, TissuesSegNotFoundError
 from .aorta import calculate_aorta_stats as calculate_aorta_stats
 from .total import calculate_total_segmentation_stats as calculate_total_stats
@@ -15,8 +15,6 @@ from .body_and_tissues import (
     calculate_body_and_tissues_stats as calculate_body_and_tissues_stats,
 )
 from .contrast_detection import predict_contrast as predict_contrast
-
-from mircat_stats.configs import set_num_threads
 
 
 def calculate_nifti_stats(
@@ -82,18 +80,16 @@ def single_nifti_stats(
         Whether to apply a gaussian smoothing to the image
     """
     try:
-        nifti = NiftiMircato(input_nifti)
+        nifti = MircatNifti(input_nifti)
         nifti.setup(task_list, gaussian)
-
         # Set up the default values
         header_data = nifti.header_data
-        all_stats: dict = header_data
+        vert_midlines: dict = nifti.vert_midlines
+        all_stats: dict = {**header_data, **vert_midlines}
         contrast_time = 0
         total_time = 0
         aorta_time = 0
         tissues_time = 0
-        total_stats = {}
-        vert_midlines = {}
         all_completed = False
         # Run the statistics tasks
         if "contrast" in task_list:
@@ -102,81 +98,19 @@ def single_nifti_stats(
             all_stats.update(contrast_stats)
 
         if "total" in task_list:
-            (total_stats, vert_midlines), total_time = calculate_total_stats(nifti)
+            total_stats, total_time = calculate_total_stats(nifti)
             all_stats["total_completed"] = True
             all_stats.update(total_stats)
-            all_stats.update(vert_midlines)
 
         if "aorta" in task_list:
-            if "total" in task_list and total_stats and vert_midlines:
-                if (
-                    total_stats.get("aorta_volume_cm3") is not None
-                    and all_stats.get("ct_direction", "AX") == "AX"
-                ):
-                    aorta_stats, aorta_time = calculate_aorta_stats(nifti, vert_midlines)
-                    all_stats["aorta_completed"] = True
-                    all_stats.update(aorta_stats)
-                else:
-                    logger.warning(
-                        "Either aorta does not exist or the CT direction is not AX, so aorta will be skipped."
-                    )
-            elif "aorta" in task_list and "total" not in task_list:
-                if nifti.stats_exist and nifti.vert_midlines != {}:
-                    aorta_stats, aorta_time = calculate_aorta_stats(
-                        nifti, nifti.vert_midlines
-                    )
-                    all_stats["aorta_completed"] = True
-                    all_stats.update(aorta_stats)
-                else:
-                    logger.warning(
-                        "Vertebrae midlines do not exist, so total stats will be ran."
-                    )
-                    (total_stats, vert_midlines), total_time = calculate_total_stats(nifti)
-                    all_stats["total_completed"] = True
-                    all_stats.update(total_stats)
-                    all_stats.update(vert_midlines)
-                    # Now run aorta stats
-                    if (
-                        total_stats.get("aorta_volume_cm3") is not None
-                        and all_stats.get("ct_direction", "AX") == "AX"
-                    ):
-                        aorta_stats, aorta_time = calculate_aorta_stats(
-                            nifti, vert_midlines
-                        )
-                        all_stats["aorta_completed"] = True
-                        all_stats.update(aorta_stats)
-                    else:
-                        logger.warning(
-                            "Either aorta does not exist or the CT direction is not AX, so aorta will be skipped."
-                        )
+            aorta_stats, aorta_time = calculate_aorta_stats(nifti)
+            all_stats["aorta_completed"] = True
+            all_stats.update(aorta_stats)
 
         if "tissues" in task_list:
-            if vert_midlines:
-                tissues_data, tissues_time = calculate_body_and_tissues_stats(
-                    nifti, vert_midlines
-                )
-                all_stats["tissues_completed"] = True
-                all_stats.update(tissues_data)
-            elif nifti.stats_exist and nifti.vert_midlines != {}:
-                tissues_data, tissues_time = calculate_body_and_tissues_stats(
-                    nifti, nifti.vert_midlines
-                )
-                all_stats["tissues_completed"] = True
-                all_stats.update(tissues_data)
-            else:
-                logger.warning(
-                    "Vertebrae midlines do not exist, so total stats will be ran."
-                )
-                (total_stats, vert_midlines), total_time = calculate_total_stats(nifti)
-                all_stats["total_completed"] = True
-                all_stats.update(total_stats)
-                all_stats.update(vert_midlines)
-                # Now run tissues stats
-                tissues_data, tissues_time = calculate_body_and_tissues_stats(
-                    nifti, vert_midlines
-                )
-                all_stats["tissues_completed"] = True
-                all_stats.update(tissues_data)
+            tissues_data, tissues_time = calculate_body_and_tissues_stats(nifti)
+            all_stats["tissues_completed"] = True
+            all_stats.update(tissues_data)
 
         if mark_complete:
             all_completed = True
