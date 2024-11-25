@@ -1,6 +1,6 @@
 # Module for curved planar reformation from centerline. Only good for straightened CPR currently
-
 import numpy as np
+from loguru import logger
 from scipy.interpolate import CubicSpline, interpn
 from skimage import measure
 from skimage.measure._regionprops import RegionProperties
@@ -28,13 +28,17 @@ def create_straightened_cpr(
     """
     tangents = _compute_tangent_vectors(centerline)
     cpr = []
+    num_touching = 0
     for center_point, normal_vector in zip(centerline, tangents):
         cross_section = _extract_cross_sectional_slice(
             vessel, center_point, normal_vector, cross_section_xy, resolution, is_binary
         )
         if is_binary:
-            cross_section = _postprocess_cross_section(cross_section, sigma)
+            cross_section, touches_border = _postprocess_cross_section(cross_section, sigma)
+            num_touching += touches_border
         cpr.append(cross_section)
+    if num_touching > 0:
+        logger.debug(f"Number of border touching cross-sections dropped: {num_touching}")
     cpr = np.stack(cpr, axis=0)
     return cpr
 
@@ -147,7 +151,24 @@ def _postprocess_cross_section(cross_section: np.ndarray, sigma: int) -> np.ndar
         output_cross_section[center_label == 1] = (
             label  # Assign the output of the binary to the appropriate label
         )
-    return output_cross_section
+            # Check if the center label touches the image border
+    height, width = output_cross_section.shape
+    borders = {
+        'top': 0,
+        'bottom': height - 1, 
+        'left': 0,
+        'right': width - 1
+    }
+    touches_border = {
+        'top': np.any(center_label[borders['top'], :]),
+        'bottom': np.any(center_label[borders['bottom'], :]),
+        'left': np.any(center_label[:, borders['left']]),
+        'right': np.any(center_label[:, borders['right']])
+    }
+    touching_any = any(touches_border.values())
+    if touching_any:
+        return np.zeros_like(cross_section), 1
+    return output_cross_section, 0
 
 
 def _filter_label_regions(cross_section: np.ndarray, label: int) -> np.ndarray:

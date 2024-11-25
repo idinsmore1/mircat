@@ -70,7 +70,7 @@ def skeletonize_vessel(
     :return: a tuple containing the centerline vertices and edges
     """
     # These are the 2 necessary parameters for teasar algorithm
-    teasar_params = {"const": 40, "scale": 1.5}
+    teasar_params = {"const": 80, "scale": 1.}
     if kwargs:
         _validate_skeletonize_kwargs(kwargs)
         teasar_kwargs = _extract_teasar_kwargs(kwargs)
@@ -237,7 +237,7 @@ def _smooth_centerline(
     :return: the smoothed centerline
     """
     n_dimensions = sampled_centerline.shape[1]
-    polyorder = 2
+    polyorder = 3
 
     def _change_if_odd(window):
         if not window % 2:

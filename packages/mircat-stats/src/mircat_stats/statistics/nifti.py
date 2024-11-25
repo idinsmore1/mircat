@@ -266,6 +266,9 @@ def resample_nifti_sitk(
     """
     input_image = sitk.ReadImage(nifti_path)
     # Get the original spacing and size
+    return _resample(input_image, new_spacing, is_label, gaussian)
+
+def _resample(input_image, new_spacing, is_label, gaussian):
     original_spacing = input_image.GetSpacing()
     original_size = input_image.GetSize()
 
