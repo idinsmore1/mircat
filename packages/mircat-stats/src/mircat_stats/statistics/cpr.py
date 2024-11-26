@@ -102,22 +102,38 @@ def _extract_cross_sectional_slice(arr, point, tangent_vector, slice_size, resol
     y = np.arange(arr.shape[1])
     z = np.arange(arr.shape[2])
     if is_binary:
-        # Perform nearest interpolation
-        method = "nearest"
+        method = 'nearest'
         fill_value = 0
+        slice_points = np.rint(slice_points).astype(int)
+        # Initialize an empty slice with zeros (padding)
+        slice_2d = np.zeros(
+            (int(height / resolution), int(width / resolution)), dtype=arr.dtype
+        )
+        if arr.min() != 0:
+            slice_2d = slice_2d + arr.min()
+        # Compute valid index ranges considering the boundaries
+        valid_x = (slice_points[..., 0] >= 0) & (slice_points[..., 0] < arr.shape[0])
+        valid_y = (slice_points[..., 1] >= 0) & (slice_points[..., 1] < arr.shape[1])
+        valid_z = (slice_points[..., 2] >= 0) & (slice_points[..., 2] < arr.shape[2])
+        valid_indices = valid_x & valid_y & valid_z
+        # Extract values for valid indices and assign to the slice, leave zeros elsewhere
+        valid_points = slice_points[valid_indices]
+        slice_2d[valid_indices] = arr[
+            valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]
+        ]
     else:
         # Perform linear interpolation in each axis
         method = "linear"
         fill_value = arr.min()
-    # Perform the interpolation
-    slice_2d = interpn(
-        (x, y, z),
-        arr,
-        slice_points,
-        method=method,
-        bounds_error=False,
-        fill_value=fill_value,
-    )
+        # Perform the interpolation
+        slice_2d = interpn(
+            (x, y, z),
+            arr,
+            slice_points,
+            method=method,
+            bounds_error=False,
+            fill_value=fill_value,
+        )
     return slice_2d
 
 
@@ -205,13 +221,26 @@ def measure_largest_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple, diff_thr
     avg_diams = []
     major_diams = []
     minor_diams = []
+    solidity_threshold = 0.95
+    circularity_threshold = 0.9
+    eccentricity_threshold = 0.8
     for cross_section in cpr:
-        avg_diam, major_diam, minor_diam = measure_cross_sectional_diameter(
+        data = measure_cross_sectional_diameter(
             cross_section, pixel_spacing, diff_threshold
         )
-        avg_diams.append(avg_diam)
-        major_diams.append(major_diam)
-        minor_diams.append(minor_diam)
+        is_convex = data['solidity'] >= solidity_threshold
+        is_circular = data['circularity'] >= circularity_threshold and data['circularity'] <= 1
+        is_not_elliptical = data['eccentricity'] <= eccentricity_threshold
+        if is_convex and is_circular and is_not_elliptical:
+            logger.debug(f"Cross-section passed: {data}")
+            avg_diam = data['max_diam']
+            major_diam = data['major_diam']
+            minor_diam = data['minor_diam']
+            avg_diams.append(avg_diam)
+            major_diams.append(major_diam)
+            minor_diams.append(minor_diam)
+        else:
+            logger.warning(f"Cross-section failed: {data}")
     if avg_diams:
         largest_idx = np.argmax(avg_diams)
         diam_dict = {
@@ -232,7 +261,8 @@ def measure_mid_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple) -> dict:
     len_cpr = len(cpr)
     midslice = len_cpr // 2
     if len_cpr > 0:
-        avg_diam, _, _ = measure_cross_sectional_diameter(cpr[midslice], pixel_spacing, diff_threshold=5)
+        data = measure_cross_sectional_diameter(cpr[midslice], pixel_spacing, diff_threshold=5)
+        avg_diam = data["max_diam"]
     else:
         avg_diam = None
     return {"mid_diam": avg_diam}
@@ -240,17 +270,25 @@ def measure_mid_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple) -> dict:
 
 def measure_cross_sectional_diameter(
     cross_section: np.ndarray, pixel_spacing: tuple, diff_threshold: int
-) -> tuple[float, float, float]:
+) -> dict[str, float]:
     """Measure the cross-sectional diameter from a straightened cpr slice
     :param cross_section: the binary straightened cpr slice as a numpy array
     :param pixel_spacing: the pixel spacing of the cpr slice
     :param diff_threshold: the maximum difference allowed between major and minor diameters.
         If |major - minor| > diff_threshold, set the average diameter = minor diameter to be conservative
-    :return: a tuple containing the average, max, and min diameter of the cpr slice
+    :return: a dictionary containing the max, major, minor diameters, as well as the solidarity, cicularity, and eccentricity
     """
     regions = _get_regions(cross_section)
+    data = {
+        'max_diam': 0,
+        'major_diam': 0,
+        'minor_diam': 0,
+        'solidity': 0,
+        'circularity': 0,
+        'eccentricity': 1.0
+    }
     if len(regions) == 0:
-        return 0, 0, 0
+        return data
     region = regions[0]
     major_endpoints, minor_endpoints = _get_cross_section_endpoints(region)
     major_units = list(np.multiply(major_endpoints, pixel_spacing))
@@ -258,10 +296,21 @@ def measure_cross_sectional_diameter(
     major_diam = _endpoint_euclidean_distance(major_units)
     minor_diam = _endpoint_euclidean_distance(minor_units)
     if abs(major_diam - minor_diam) < diff_threshold:
-        avg_diam = round((major_diam + minor_diam) / 2, 1)
+        max_diam = round((major_diam + minor_diam) / 2, 1)
     else:
-        avg_diam = min(major_diam, minor_diam)
-    return avg_diam, major_diam, minor_diam
+        max_diam = min(major_diam, minor_diam)
+    solidity = region.solidity 
+    circularity = (4 * np.pi * region.area) / (region.perimeter ** 2) if region.perimeter > 0 else 0
+    eccentricity = region.eccentricity
+    data.update({
+        'max_diam': max_diam,
+        'major_diam': major_diam,
+        'minor_diam': minor_diam,
+        'solidity': round(solidity, 2),
+        'circularity': round(circularity, 2),
+        'eccentricity': round(eccentricity, 2)
+    })
+    return data
 
 
 def _get_regions(image: np.ndarray) -> list[RegionProperties]:
