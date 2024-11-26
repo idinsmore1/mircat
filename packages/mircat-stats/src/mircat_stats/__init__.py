@@ -35,7 +35,11 @@ def mircat_stats():
         "-nm", "--no-mip", help="Do not convert likely mip series", action="store_true"
     )
     convert_parser.add_argument(
-        "-th", "--threads", help="Number of threads for each worker", type=int, default=1
+        "-th",
+        "--threads",
+        help="Number of threads for each worker",
+        type=int,
+        default=1,
     )
     # Set up stats parser
     stats_parser = subparsers.add_parser(
@@ -75,10 +79,10 @@ def mircat_stats():
         help="Mark the statistics as complete regardless of stats performed",
     )
     stats_parser.add_argument(
-        '-g',
-        '--gaussian',
-        action='store_true',
-        help='Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling'
+        "-g",
+        "--gaussian",
+        action="store_true",
+        help="Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling",
     )
     # Create update parser
     update_parser = subparsers.add_parser(
@@ -89,7 +93,9 @@ def mircat_stats():
     update_parser.add_argument(
         "-n", "--num-workers", help="Number of workers", type=int, default=1
     )
-    update_parser.add_argument("-th", "--threads", help="Number of threads", type=int, default=1)
+    update_parser.add_argument(
+        "-th", "--threads", help="Number of threads", type=int, default=1
+    )
 
     args = parser.parse_args()
     args.verbose = not args.quiet
@@ -125,7 +131,7 @@ def mircat_stats():
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
         configure_logging(logger, logfile, args.verbose)
-    
+
         if args.command == "stats":
             calculate_nifti_stats(
                 nifti_list,
@@ -133,11 +139,9 @@ def mircat_stats():
                 args.num_workers,
                 args.threads,
                 args.mark_complete,
-                args.gaussian
+                args.gaussian,
             )
         elif args.command == "update":
             update(nifti_list, args.num_workers)
         else:
             print("Unknown command")
-
-

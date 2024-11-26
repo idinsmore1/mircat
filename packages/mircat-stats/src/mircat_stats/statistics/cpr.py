@@ -34,11 +34,15 @@ def create_straightened_cpr(
             vessel, center_point, normal_vector, cross_section_xy, resolution, is_binary
         )
         if is_binary:
-            cross_section, touches_border = _postprocess_cross_section(cross_section, sigma)
+            cross_section, touches_border = _postprocess_cross_section(
+                cross_section, sigma
+            )
             num_touching += touches_border
         cpr.append(cross_section)
     if num_touching > 0:
-        logger.debug(f"Number of border touching cross-sections dropped: {num_touching}")
+        logger.debug(
+            f"Number of border touching cross-sections dropped: {num_touching}"
+        )
     cpr = np.stack(cpr, axis=0)
     return cpr
 
@@ -151,19 +155,14 @@ def _postprocess_cross_section(cross_section: np.ndarray, sigma: int) -> np.ndar
         output_cross_section[center_label == 1] = (
             label  # Assign the output of the binary to the appropriate label
         )
-            # Check if the center label touches the image border
+        # Check if the center label touches the image border
     height, width = output_cross_section.shape
-    borders = {
-        'top': 0,
-        'bottom': height - 1, 
-        'left': 0,
-        'right': width - 1
-    }
+    borders = {"top": 0, "bottom": height - 1, "left": 0, "right": width - 1}
     touches_border = {
-        'top': np.any(center_label[borders['top'], :]),
-        'bottom': np.any(center_label[borders['bottom'], :]),
-        'left': np.any(center_label[:, borders['left']]),
-        'right': np.any(center_label[:, borders['right']])
+        "top": np.any(center_label[borders["top"], :]),
+        "bottom": np.any(center_label[borders["bottom"], :]),
+        "left": np.any(center_label[:, borders["left"]]),
+        "right": np.any(center_label[:, borders["right"]]),
     }
     touching_any = any(touches_border.values())
     if touching_any:

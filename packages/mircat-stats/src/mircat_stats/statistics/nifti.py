@@ -28,6 +28,7 @@ class BodySegNotFoundError(FileNotFoundError):
     """
     Raised when the body segmentation file is not found
     """
+
     pass
 
 
@@ -35,6 +36,7 @@ class TotalSegNotFoundError(FileNotFoundError):
     """
     Raised when the total segmentation file is not found
     """
+
     pass
 
 
@@ -42,6 +44,7 @@ class TissuesSegNotFoundError(FileNotFoundError):
     """
     Raised when the tissues segmentation file is not found
     """
+
     pass
 
 
@@ -138,13 +141,17 @@ class MircatNifti:
                     f'Tissues segmentation file {self.seg_files["tissues"]} does not exist'
                 )
 
-    def _load_original_ct(self, resample_spacing=[1.0, 1.0, 1.0], gaussian=False) -> None:
+    def _load_original_ct(
+        self, resample_spacing=[1.0, 1.0, 1.0], gaussian=False
+    ) -> None:
         """Load in the original CT array"""
         self.original_ct = resample_nifti_sitk(
             self.path, resample_spacing, is_label=False, gaussian=gaussian
         )
-    
-    def _load_seg_arrays(self, task_list, gaussian: bool, resample_spacing=[1.0, 1.0, 1.0]) -> None:
+
+    def _load_seg_arrays(
+        self, task_list, gaussian: bool, resample_spacing=[1.0, 1.0, 1.0]
+    ) -> None:
         """Load in the original CT and segmentation arrays
         Parameters
         ----------
@@ -162,22 +169,37 @@ class MircatNifti:
         original_size = self.original_ct.GetSize()
         if needs_total:
             self.total_seg = resample_nifti_sitk(
-                self.seg_files["total"], resample_spacing, is_label=True, gaussian=gaussian
+                self.seg_files["total"],
+                resample_spacing,
+                is_label=True,
+                gaussian=gaussian,
             )
             if original_size != self.total_seg.GetSize():
-                raise ValueError("Size of total segmentation is not consistent with original ct.")
+                raise ValueError(
+                    "Size of total segmentation is not consistent with original ct."
+                )
         if needs_tissues:
             self.body_seg = resample_nifti_sitk(
-                self.seg_files["body"], resample_spacing, is_label=True, gaussian=gaussian
+                self.seg_files["body"],
+                resample_spacing,
+                is_label=True,
+                gaussian=gaussian,
             )
             self.tissues_seg = resample_nifti_sitk(
-                self.seg_files["tissues"], resample_spacing, is_label=True, gaussian=gaussian
+                self.seg_files["tissues"],
+                resample_spacing,
+                is_label=True,
+                gaussian=gaussian,
             )
             if original_size != self.body_seg.GetSize():
-                raise ValueError("Size of body segmentation is not consistent with original ct.")
+                raise ValueError(
+                    "Size of body segmentation is not consistent with original ct."
+                )
             if original_size != self.tissues_seg.GetSize():
-                raise ValueError("Size of tissues segmentation is not consistent with original ct.")
-    
+                raise ValueError(
+                    "Size of tissues segmentation is not consistent with original ct."
+                )
+
     def _load_stats(self) -> None:
         try:
             with self.output_file.open("r") as f:
@@ -187,10 +209,17 @@ class MircatNifti:
             self.vert_midlines = {
                 k: v for k, v in vert_midlines.items() if v is not None
             }
-            if self.vert_midlines.get('vertebrae_T12L1_midline') is None:
-                if self.vert_midlines.get('vertebrae_L1_midline') is not None and self.vert_midlines.get('vertebrae_T12_midline') is not None:
+            if self.vert_midlines.get("vertebrae_T12L1_midline") is None:
+                if (
+                    self.vert_midlines.get("vertebrae_L1_midline") is not None
+                    and self.vert_midlines.get("vertebrae_T12_midline") is not None
+                ):
                     self.vert_midlines["vertebrae_T12L1_midline"] = int(
-                        (self.vert_midlines["vertebrae_L1_midline"] + self.vert_midlines["vertebrae_T12_midline"]) / 2
+                        (
+                            self.vert_midlines["vertebrae_L1_midline"]
+                            + self.vert_midlines["vertebrae_T12_midline"]
+                        )
+                        / 2
                     )
             self.stats_exist = True
 
@@ -217,9 +246,16 @@ class MircatNifti:
                 indices = shape_stats.GetIndexes(label)
                 z_indices = indices[2::3]
                 vert_midlines[f"{name}_midline"] = int(median(z_indices))
-        if "vertebrae_L1_midline" in vert_midlines and "vertebrae_T12_midline" in vert_midlines:
+        if (
+            "vertebrae_L1_midline" in vert_midlines
+            and "vertebrae_T12_midline" in vert_midlines
+        ):
             vert_midlines["vertebrae_T12L1_midline"] = int(
-                (vert_midlines["vertebrae_L1_midline"] + vert_midlines["vertebrae_T12_midline"]) / 2
+                (
+                    vert_midlines["vertebrae_L1_midline"]
+                    + vert_midlines["vertebrae_T12_midline"]
+                )
+                / 2
             )
         self.vert_midlines = vert_midlines
 
@@ -258,7 +294,7 @@ def resample_nifti_sitk(
         Whether the NIfTI file is a label map
     gaussian: bool
         Whether to apply Gaussian smoothing to the image
-    
+
     Returns
     -------
     sitk.Image
@@ -267,6 +303,7 @@ def resample_nifti_sitk(
     input_image = sitk.ReadImage(nifti_path)
     # Get the original spacing and size
     return _resample(input_image, new_spacing, is_label, gaussian)
+
 
 def _resample(input_image, new_spacing, is_label, gaussian):
     original_spacing = input_image.GetSpacing()

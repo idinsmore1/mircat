@@ -3,6 +3,7 @@ from pathlib import Path
 from shutil import copy
 from mircat_seg.core import segment_niftis as segment_niftis
 
+
 def mircat_seg():
     print("Hello from mircat-seg!")
     print("Running segmentation...")

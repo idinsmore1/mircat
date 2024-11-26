@@ -76,7 +76,6 @@ def _process_dicom_folder(
     dicom_folder.convert_to_nifti(output_dir, only_ax, no_mip)
 
 
-
 def update(niftis: list, num_workers: int):
     """Update the header and stats data for a NIfTI file to the latest version
     Parameters
@@ -123,7 +122,9 @@ def update_header_and_stats(nifti: Path):
     nifti_as_dicom = DicomFolder(nifti_folder)
     dicom_files = nifti_as_dicom._find_dicoms_in_folder()
     # Some nifti folders will have a dicom with .dcm extension, others will not
-    if len(dicom_files) == 1:  # This will always be the case if .dcm extension is present
+    if (
+        len(dicom_files) == 1
+    ):  # This will always be the case if .dcm extension is present
         nifti_as_dicom.reference_dicom = dicom_files[0]
         nifti_as_dicom._generate_reference_dict()
     else:
@@ -143,7 +144,7 @@ def update_header_and_stats(nifti: Path):
                 "output_file": str(output_file),
                 "completed": False,
                 "failed_reason": "No valid reference dicom found",
-            }
+            },
         )
         return
     header_data = nifti_as_dicom.ref_data

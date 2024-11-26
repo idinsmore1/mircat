@@ -26,7 +26,11 @@ def mircat():
     convert_parser.add_argument("dicoms", help="Path to DICOM files", type=Path)
     convert_parser.add_argument("output_dir", help="Output directory", type=Path)
     convert_parser.add_argument(
-        "-n", "--num-workers", help="Number of workers for converting dicom folders.", type=int, default=1
+        "-n",
+        "--num-workers",
+        help="Number of workers for converting dicom folders.",
+        type=int,
+        default=1,
     )
     convert_parser.add_argument(
         "-ax",
@@ -38,7 +42,11 @@ def mircat():
         "-nm", "--no-mip", help="Do not convert likely mip series", action="store_true"
     )
     convert_parser.add_argument(
-        "-th", "--threads", help="Number of threads for each worker", type=int, default=1
+        "-th",
+        "--threads",
+        help="Number of threads for each worker",
+        type=int,
+        default=1,
     )
     # Set up segment subparser
     # Create the 'segment' subparser
@@ -131,10 +139,10 @@ def mircat():
         help="Mark the statistics as complete regardless of stats performed",
     )
     stats_parser.add_argument(
-        '-g',
-        '--gaussian',
-        action='store_true',
-        help='Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling'
+        "-g",
+        "--gaussian",
+        action="store_true",
+        help="Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling",
     )
     # Create update parser
     update_parser = subparsers.add_parser(
@@ -145,12 +153,14 @@ def mircat():
     update_parser.add_argument(
         "-n", "--num-workers", help="Number of workers", type=int, default=1
     )
-    update_parser.add_argument("-th", "--threads", help="Number of threads", type=int, default=1)
+    update_parser.add_argument(
+        "-th", "--threads", help="Number of threads", type=int, default=1
+    )
 
     args = parser.parse_args()
     args.verbose = not args.quiet
     threadpool_limits(args.threads)
-    ## Logic for selection 
+    ## Logic for selection
     if args.command == "convert":
         if args.dicoms.is_dir():
             logfile = "./nifti_conversion_log.json"
@@ -197,10 +207,9 @@ def mircat():
                 args.num_workers,
                 args.threads,
                 args.mark_complete,
-                args.gaussian
+                args.gaussian,
             )
         elif args.command == "update":
             update(nifti_list, args.num_workers)
         else:
             print("Unknown command")
-

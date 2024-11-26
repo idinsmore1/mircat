@@ -25,7 +25,7 @@ ROOT_LENGTH = 10
 
 
 @timer
-def calculate_aorta_stats(nifti: MircatNifti) -> dict:
+def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
     """Calculate the statistics for the aorta
     Parameters
     ----------
@@ -42,7 +42,7 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict:
     vert_midlines: dict = nifti.vert_midlines
     # These are all the possible vertebral regions of the aorta. Scans will have some subset of these
     region_vert_map = {
-        "abdominal": ["S1", *[f"L{i}" for i in range(1, 6)], 'T12L1'],
+        "abdominal": ["S1", *[f"L{i}" for i in range(1, 6)], "T12L1"],
         "thoracic": [f"T{i}" for i in range(1, 13)],
         "descending": [f"T{i}" for i in range(5, 13)],
     }
@@ -56,7 +56,11 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict:
     # Get stats for each region of the aorta
     img = nifti.original_ct
     try:
-        seg = Segmentation(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"], reload_gaussian=True).segmentation
+        seg = Segmentation(
+            nifti,
+            ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"],
+            reload_gaussian=reload_gaussian,
+        ).segmentation
         measure_aorta_region = partial(_measure_aorta_region, img, seg)
         find_region_endpoints = partial(
             _find_aortic_region_endpoints, vert_midlines=vert_midlines

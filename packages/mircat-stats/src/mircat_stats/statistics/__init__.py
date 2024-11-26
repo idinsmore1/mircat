@@ -23,7 +23,7 @@ def calculate_nifti_stats(
     num_workers: int,
     num_threads: int,
     mark_complete: bool,
-    gaussian: bool
+    gaussian: bool,
 ):
     """Function that calculates statistics for a list of nifti files over a set number of workers
     Parameters
@@ -45,8 +45,18 @@ def calculate_nifti_stats(
     stats_start = time()
     with threadpool_limits(limits=num_threads):
         if num_workers > 1:
-            pbar = tqdm(nifti_files, total=len(nifti_files), desc="Measuring Niftis", dynamic_ncols=True)
-            nifti_stats = partial(single_nifti_stats, task_list=task_list, mark_complete=mark_complete, gaussian=gaussian)
+            pbar = tqdm(
+                nifti_files,
+                total=len(nifti_files),
+                desc="Measuring Niftis",
+                dynamic_ncols=True,
+            )
+            nifti_stats = partial(
+                single_nifti_stats,
+                task_list=task_list,
+                mark_complete=mark_complete,
+                gaussian=gaussian,
+            )
             with Pool(num_workers) as pool:
                 for _ in pool.imap_unordered(nifti_stats, nifti_files):
                     pbar.update(1)
@@ -103,7 +113,9 @@ def single_nifti_stats(
             all_stats.update(total_stats)
 
         if "aorta" in task_list:
-            aorta_stats, aorta_time = calculate_aorta_stats(nifti)
+            # gaussian flag here reloads the aorta segmentation with gaussian smoothing if it was not done
+            # for all segmentations.
+            aorta_stats, aorta_time = calculate_aorta_stats(nifti, not gaussian)
             all_stats["aorta_completed"] = True
             all_stats.update(aorta_stats)
 

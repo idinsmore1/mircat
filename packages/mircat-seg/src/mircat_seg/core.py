@@ -106,10 +106,10 @@ def task_specific_segmentation(
         roi_size=task_config["patch_size"], sw_batch_size=sw_batch_size, overlap=0.5
     )
     # Run the inference using task configurations
-    if device == torch.device('cpu'):
-        autocast_device = 'cpu'
+    if device == torch.device("cpu"):
+        autocast_device = "cpu"
     else:
-        autocast_device = 'cuda'
+        autocast_device = "cuda"
     with autocast(device_type=autocast_device):  # All models used AMP for training
         with torch.no_grad():
             for data in dataloader:
