@@ -40,9 +40,7 @@ SKELETONIZE_KWARGS = TEASAR_KWARGS.union(NON_TEASAR_KWARGS)
 SAMPLING_KWARGS = {"is_thoracic", "number_of_points", "window_length"}
 
 
-def create_centerline(
-    vessel: np.ndarray, voxel_spacing: tuple, vessel_label: int = 1, **kwargs
-) -> np.ndarray | None:
+def create_centerline(vessel: np.ndarray, voxel_spacing: tuple, vessel_label: int = 1, **kwargs) -> np.ndarray | None:
     """Create a centerline for a given vessel using skeletonize_vessel and postprocess_skeleton
     :param vessel: vessel array
     :param voxel_spacing: voxel spacing
@@ -50,9 +48,7 @@ def create_centerline(
     :param kwargs: kwargs for skeletonize_vessel and postprocess_skeleton
     """
     skeleton_kwargs, sampling_kwargs = _validate_centerline_kwargs(kwargs)
-    vertices, edges = skeletonize_vessel(
-        vessel, voxel_spacing, vessel_label, **skeleton_kwargs
-    )
+    vertices, edges = skeletonize_vessel(vessel, voxel_spacing, vessel_label, **skeleton_kwargs)
     if vertices is None:
         return None
     centerline = postprocess_skeleton(vertices, edges, **sampling_kwargs)
@@ -96,18 +92,14 @@ def skeletonize_vessel(
     )
     try:
         skel = skeleton[vessel_label]
-        vertices = (
-            skel.vertices / voxel_spacing
-        )  # Divide by voxel spacing to have the units match
+        vertices = skel.vertices / voxel_spacing  # Divide by voxel spacing to have the units match
         edges = skel.edges
         return vertices, edges
     except KeyError:
         return None, None
 
 
-def postprocess_skeleton(
-    vertices: np.ndarray, edges: np.ndarray, **kwargs
-) -> np.ndarray:
+def postprocess_skeleton(vertices: np.ndarray, edges: np.ndarray, **kwargs) -> np.ndarray:
     """Postprocess the kimimaro skeleton into a final centerline
     :param vertices: the vertices of the centerline
     :param edges: the edges listing the connections between vertices
@@ -190,9 +182,7 @@ def _arclength_space_centerline(ordered_centerline: np.ndarray) -> np.ndarray:
     total_length = arc_lengths[-1]
     normalized_arc_lengths = arc_lengths / total_length
     # Create interpolation functions for each coordinate
-    interp_funcs = [
-        interp1d(normalized_arc_lengths, ordered_centerline[:, i]) for i in range(3)
-    ]
+    interp_funcs = [interp1d(normalized_arc_lengths, ordered_centerline[:, i]) for i in range(3)]
     # Create a new uniform parameterization
     uniform_t = np.linspace(0, 1, len(ordered_centerline))
     # Interpolate the centerline points
@@ -200,18 +190,14 @@ def _arclength_space_centerline(ordered_centerline: np.ndarray) -> np.ndarray:
     return uniform_centerline
 
 
-def _evenly_sample_centerline(
-    spaced_centerline: np.ndarray, number_of_points: int
-) -> np.ndarray:
+def _evenly_sample_centerline(spaced_centerline: np.ndarray, number_of_points: int) -> np.ndarray:
     """Evenly sample a specified number of points along the centerline
     :param spaced_centerline: the output of _arclength_space_centerline
     :param number_of_points: the number of points to sample from the centerline
     :return: the evenly sampled centerline of shape (number_of_points, 3)
     """
     # Calculate the cumulative distance along the centerline
-    distances = np.cumsum(
-        np.r_[0, np.linalg.norm(np.diff(spaced_centerline, axis=0), axis=1)]
-    )
+    distances = np.cumsum(np.r_[0, np.linalg.norm(np.diff(spaced_centerline, axis=0), axis=1)])
     total_length = distances[-1]
 
     # Create an interpolation function for each dimension
@@ -222,15 +208,11 @@ def _evenly_sample_centerline(
     # Evenly sample distances along the centerline
     sample_points = np.linspace(0, total_length, number_of_points)
     # Sample the centerline
-    sampled_centerline = np.column_stack(
-        (f_z(sample_points), f_y(sample_points), f_x(sample_points))
-    )
+    sampled_centerline = np.column_stack((f_z(sample_points), f_y(sample_points), f_x(sample_points)))
     return sampled_centerline
 
 
-def _smooth_centerline(
-    sampled_centerline: np.ndarray, window_length: int
-) -> np.ndarray:
+def _smooth_centerline(sampled_centerline: np.ndarray, window_length: int) -> np.ndarray:
     """Use a window length to smooth the centerline using a savitzky-golay filter
     :param sampled_centerline: the sampled point centerline from _evenly_sample_centerline
     :param window_length: the length of the filter window
@@ -248,19 +230,13 @@ def _smooth_centerline(
     if window_length > len(sampled_centerline):
         window_length = _change_if_odd(int(len(sampled_centerline) // 2))
     if window_length < polyorder:
-        logger.debug(
-            f"Window length {window_length} is smaller than polyorder {polyorder}"
-        )
+        logger.debug(f"Window length {window_length} is smaller than polyorder {polyorder}")
         window_length = polyorder + 1
         # raise ValueError(f'Window length {window_length} is smaller than polyorder {polyorder}')
     smoothed_centerline = np.zeros_like(sampled_centerline)
     for dim in range(n_dimensions):
-        smoothed_centerline[:, dim] = savgol_filter(
-            sampled_centerline[:, dim], window_length, polyorder
-        )
-    smoothed_centerline = smoothed_centerline.round().astype(
-        np.uint16
-    )  # Make sure the centerline is integers
+        smoothed_centerline[:, dim] = savgol_filter(sampled_centerline[:, dim], window_length, polyorder)
+    smoothed_centerline = smoothed_centerline.round().astype(np.uint16)  # Make sure the centerline is integers
     return smoothed_centerline
 
 
@@ -271,10 +247,7 @@ def _get_sampling_values(skeleton_length: int, kwargs: dict) -> tuple[int, int]:
     :return: a tuple containing the (number_of_points, window_length)
     """
     is_thoracic = kwargs.get("is_thoracic", False)
-    has_specified_values = (
-        kwargs.get("number_of_points") is not None
-        and kwargs.get("window_length") is not None
-    )
+    has_specified_values = kwargs.get("number_of_points") is not None and kwargs.get("window_length") is not None
     if has_specified_values:
         number_of_points = kwargs.get("number_of_points")
         window_length = kwargs.get("window_length")
@@ -309,24 +282,18 @@ def _validate_sampling_kwargs(kwargs):
     window_length = kwargs.get("window_length")
     # Check thoracic first
     if is_thoracic is not None:
-        assert is_thoracic in [True, False], ValueError(
-            f'is_thoracic must be a boolean: {kwargs.get("is_thoracic")=}'
-        )
+        assert is_thoracic in [True, False], ValueError(f'is_thoracic must be a boolean: {kwargs.get("is_thoracic")=}')
     if is_thoracic is None:
         assert number_of_points is not None and window_length is not None, ValueError(
             "number_of_points and window_length must be given if is_thoracic is None"
         )
     elif number_of_points is not None:
-        assert isinstance(number_of_points, int), ValueError(
-            "number_of_points must be an integer"
-        )
+        assert isinstance(number_of_points, int), ValueError("number_of_points must be an integer")
         assert isinstance(window_length, int), ValueError(
             "window_length must be an integer provided with number_of_points"
         )
     elif window_length is not None:
-        assert isinstance(window_length, int), ValueError(
-            "window_length must be an integer"
-        )
+        assert isinstance(window_length, int), ValueError("window_length must be an integer")
         assert isinstance(number_of_points, int), ValueError(
             "number_of_points must be an integer provided with window_length"
         )

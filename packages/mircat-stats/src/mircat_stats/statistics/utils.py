@@ -21,9 +21,7 @@ def _calc_shape_stats(seg: sitk.Image) -> sitk.LabelShapeStatisticsImageFilter:
     return shape_stats
 
 
-def _calc_intensity_stats(
-    image: sitk.Image, seg: sitk.Image
-) -> sitk.LabelIntensityStatisticsImageFilter:
+def _calc_intensity_stats(image: sitk.Image, seg: sitk.Image) -> sitk.LabelIntensityStatisticsImageFilter:
     """Calculate intensity stats for a segmentation using the reference image
     Parameters
     ----------
@@ -63,9 +61,7 @@ def _calculate_3d_volumes_and_intensities(
     intensities = _calculate_3d_intensities(image, seg, output_map, prefix, endpoints)
     if len(volumes) == len(intensities):
         stats = {}
-        for (vol_key, vol_val), (inten_key, inten_val) in zip(
-            volumes.items(), intensities.items()
-        ):
+        for (vol_key, vol_val), (inten_key, inten_val) in zip(volumes.items(), intensities.items()):
             ord_stats = {vol_key: vol_val, inten_key: inten_val}
             stats.update(ord_stats)
     else:
@@ -73,9 +69,7 @@ def _calculate_3d_volumes_and_intensities(
     return stats
 
 
-def _calculate_3d_volumes(
-    seg: sitk.Image, output_map: dict, prefix: str = "", endpoints: tuple = (0, None)
-) -> dict:
+def _calculate_3d_volumes(seg: sitk.Image, output_map: dict, prefix: str = "", endpoints: tuple = (0, None)) -> dict:
     """Calculate the total volume for each segmentation in a sitk image
     :param seg: the sitk image containing the segmentation
     :param output_map: the dictionary containing the output segmentation label map
@@ -86,16 +80,12 @@ def _calculate_3d_volumes(
     """
     seg = _slice_images(endpoints, seg)  # type: ignore
     shape_stats = _calc_shape_stats(seg)
-    seg_labels = (
-        shape_stats.GetLabels()
-    )  # This is all labels that were found in the image
+    seg_labels = shape_stats.GetLabels()  # This is all labels that were found in the image
     volumes = {}
     for name, label in output_map.items():
         volume = None
         if label in seg_labels:
-            volume = round(
-                shape_stats.GetPhysicalSize(label) / 1000, 1
-            )  # This gives the volume in cm3 for CT
+            volume = round(shape_stats.GetPhysicalSize(label) / 1000, 1)  # This gives the volume in cm3 for CT
         volumes[f"{prefix}{name}_volume_cm3"] = volume
     return volumes
 
@@ -150,19 +140,13 @@ def _calculate_2d_areas(
     for name, label in output_map.items():
         area = None
         if label in seg_labels:
-            area = round(
-                shape_stats.GetPhysicalSize(label) / 100, 1
-            )  # This will be area in cm2 for CT
+            area = round(shape_stats.GetPhysicalSize(label) / 100, 1)  # This will be area in cm2 for CT
         areas[f"{prefix}{name}_area_cm2"] = area
         if get_perimeter and (label in seg_labels):
             # Note that the shape touches the border if at least 5 percent of the perimeter is on the border
             border_ratio = shape_stats.GetPerimeterOnBorderRatio(label) * 100
-            raw_perim = (
-                shape_stats.GetPerimeter(label) / 10
-            )  # This will be perimeter in cm
-            ellipse_perim = _calc_ellipsoid_perimeter(
-                shape_stats.GetEquivalentEllipsoidDiameter(label)
-            )
+            raw_perim = shape_stats.GetPerimeter(label) / 10  # This will be perimeter in cm
+            ellipse_perim = _calc_ellipsoid_perimeter(shape_stats.GetEquivalentEllipsoidDiameter(label))
             circ_perim = shape_stats.GetEquivalentSphericalPerimeter(label) / 10
             areas[f"{prefix}{name}_border_ratio"] = round(border_ratio, 1)
             areas[f"{prefix}{name}_total_perimeter_cm"] = round(raw_perim, 1)
@@ -181,9 +165,7 @@ def _slice_images(endpoints: tuple, images: sitk.Image | list) -> sitk.Image | l
     is_single_image = isinstance(images, sitk.Image)
     if end is None:
         if is_single_image:
-            end = images.GetSize()[
-                -1
-            ]  # This is the full length of the image along the z-axis
+            end = images.GetSize()[-1]  # This is the full length of the image along the z-axis
         else:
             # Check that all images are the same size
             image_sizes = [img.GetSize() for img in images]
@@ -208,9 +190,7 @@ def _calc_ellipsoid_perimeter(diameters: tuple) -> float:
     minor, major = diameters
     major /= 2
     minor /= 2
-    perim = np.pi * (
-        3 * (major + minor) - np.sqrt((3 * major + minor) * (major + 3 * minor))
-    )
+    perim = np.pi * (3 * (major + minor) - np.sqrt((3 * major + minor) * (major + 3 * minor)))
     return perim / 10  # This will be in cm
 
 
@@ -226,9 +206,7 @@ def _filter_largest_components(image, labels_of_interest):
 
     for label in labels_of_interest:
         # Create a binary mask for the current label
-        binary_mask = sitk.BinaryThreshold(
-            image, lowerThreshold=label, upperThreshold=label
-        )
+        binary_mask = sitk.BinaryThreshold(image, lowerThreshold=label, upperThreshold=label)
 
         # Find connected components
         connected_components = sitk.ConnectedComponent(binary_mask)
@@ -238,9 +216,7 @@ def _filter_largest_components(image, labels_of_interest):
         label_stats.Execute(connected_components)
 
         # Find the label of the largest component
-        largest_label = max(
-            label_stats.GetLabels(), key=lambda i: label_stats.GetPhysicalSize(i)
-        )
+        largest_label = max(label_stats.GetLabels(), key=lambda i: label_stats.GetPhysicalSize(i))
 
         # Create a mask of the largest component
         largest_component = sitk.BinaryThreshold(

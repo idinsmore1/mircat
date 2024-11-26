@@ -49,20 +49,14 @@ def calculate_body_and_tissues_stats(nifti: MircatNifti) -> dict[str:float]:
             vert_midlines.get("vertebrae_L1_midline") + 1,
         )
         abd_body_volumes = _calculate_3d_volumes(body, body_map, prefix, endpoints)
-        abd_tissues_volumes = _calculate_3d_volumes(
-            tissues, tissues_map, prefix, endpoints
-        )
+        abd_tissues_volumes = _calculate_3d_volumes(tissues, tissues_map, prefix, endpoints)
         output_stats.update(abd_body_volumes)
         output_stats.update(abd_tissues_volumes)
     # Get the vertebrae specific values
     for vert, midline in vert_indices.items():
         prefix = f"{vert}_"
-        body_vert_stats = _calculate_2d_areas(
-            body, body_map, midline, prefix, get_perimeter=True
-        )
-        tissues_vert_stats = _calculate_2d_areas(
-            tissues, tissues_map, midline, prefix, get_perimeter=False
-        )
+        body_vert_stats = _calculate_2d_areas(body, body_map, midline, prefix, get_perimeter=True)
+        tissues_vert_stats = _calculate_2d_areas(tissues, tissues_map, midline, prefix, get_perimeter=False)
         output_stats.update(body_vert_stats)
         output_stats.update(tissues_vert_stats)
     return output_stats

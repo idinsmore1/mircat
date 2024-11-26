@@ -99,6 +99,4 @@ torch_model_configs = {
 }
 # Calculate the crop threshold using model vals
 for config in torch_model_configs.values():
-    config["crop_threshold"] = (config["percentile_005"] - config["mean"]) / config[
-        "std"
-    ]
+    config["crop_threshold"] = (config["percentile_005"] - config["mean"]) / config["std"]

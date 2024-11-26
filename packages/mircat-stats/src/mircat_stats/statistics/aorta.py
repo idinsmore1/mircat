@@ -62,9 +62,7 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
             reload_gaussian=reload_gaussian,
         ).segmentation
         measure_aorta_region = partial(_measure_aorta_region, img, seg)
-        find_region_endpoints = partial(
-            _find_aortic_region_endpoints, vert_midlines=vert_midlines
-        )
+        find_region_endpoints = partial(_find_aortic_region_endpoints, vert_midlines=vert_midlines)
     except SegNotFoundError as e:
         logger.opt(exception=True).error("No aorta found in segmentation")
         return aorta_stats
@@ -76,9 +74,7 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
     if abdominal:
         try:
             start, end = find_region_endpoints(region_vert_map["abdominal"])
-            abd_stats = measure_aorta_region(
-                start, end, is_thoracic=False, region="abd_aorta"
-            )
+            abd_stats = measure_aorta_region(start, end, is_thoracic=False, region="abd_aorta")
             aorta_stats.update(abd_stats)
         except Exception as e:
             logger.error(f"Error measuring abdominal aorta: {e}")
@@ -92,9 +88,7 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
     elif descending:
         try:
             start, end = find_region_endpoints(region_vert_map["descending"])
-            desc_stats = measure_aorta_region(
-                start, end, is_thoracic=False, region="desc_aorta"
-            )
+            desc_stats = measure_aorta_region(start, end, is_thoracic=False, region="desc_aorta")
             aorta_stats.update(desc_stats)
         except Exception as e:
             logger.error(f"Error measuring descending aorta: {e}")
@@ -139,16 +133,12 @@ def _measure_aorta_region(
     cross_section_size = (100, 100)
     cross_section_spacing = (1, 1)
     # Measure the diameters through a CPR
-    centerline = create_centerline(
-        region_seg, aorta_anisotropy, aorta_label, is_thoracic=is_thoracic
-    )
+    centerline = create_centerline(region_seg, aorta_anisotropy, aorta_label, is_thoracic=is_thoracic)
     if centerline is None:
         logger.warning("No centerline found")
         return region_stats
     # Create the CPR
-    cpr = create_straightened_cpr(
-        region_seg, centerline, cross_section_xy=cross_section_size
-    )
+    cpr = create_straightened_cpr(region_seg, centerline, cross_section_xy=cross_section_size)
     if is_thoracic:
         diam_data = _measure_thoracic_diameters(region_seg, cpr, centerline)
         region_stats.update(diam_data)
@@ -196,9 +186,7 @@ def _check_aorta_regions(vert_midlines: dict) -> tuple[bool, bool, bool]:
     )  # L3 has to be in the image for abdominal to be measured
     abdominal = vert_midlines.get("vertebrae_L3_midline", False)
     # If at least the T12 and T9 are in the image, then we can measure the descending separate from the ascending
-    descending = vert_midlines.get(
-        "vertebrae_T12_midline", False
-    ) and vert_midlines.get("vertebrae_T9_midline", False)
+    descending = vert_midlines.get("vertebrae_T12_midline", False) and vert_midlines.get("vertebrae_T9_midline", False)
     return thoracic, abdominal, descending
 
 
@@ -242,28 +230,16 @@ def _measure_thoracic_diameters(
     if split_using_cpr:
         asc_cpr, arch_cpr, desc_cpr = _split_thoracic_using_cpr(cpr, centerline)
         if asc_cpr is None:  # If splitting using the CPR fails, split using the seg
-            asc_cpr, arch_cpr, desc_cpr = _split_thoracic_using_seg(
-                thoracic_aorta_seg, cpr, centerline
-            )
+            asc_cpr, arch_cpr, desc_cpr = _split_thoracic_using_seg(thoracic_aorta_seg, cpr, centerline)
     else:
-        asc_cpr, arch_cpr, desc_cpr = _split_thoracic_using_seg(
-            thoracic_aorta_seg, cpr, centerline
-        )
+        asc_cpr, arch_cpr, desc_cpr = _split_thoracic_using_seg(thoracic_aorta_seg, cpr, centerline)
     diam_data = {}
-    for cpr, prefix in zip(
-        [asc_cpr, arch_cpr, desc_cpr], ["asc_aorta", "aortic_arch", "desc_aorta"]
-    ):
+    for cpr, prefix in zip([asc_cpr, arch_cpr, desc_cpr], ["asc_aorta", "aortic_arch", "desc_aorta"]):
         if cpr is not None:
-            region_diams = measure_largest_cpr_diameter(
-                cpr, AORTA_CROSS_SECTION_SPACING
-            )
-            region_diams.update(
-                measure_mid_cpr_diameter(cpr, AORTA_CROSS_SECTION_SPACING)
-            )
+            region_diams = measure_largest_cpr_diameter(cpr, AORTA_CROSS_SECTION_SPACING)
+            region_diams.update(measure_mid_cpr_diameter(cpr, AORTA_CROSS_SECTION_SPACING))
             diams = {f"{prefix}_{k}": v for k, v in region_diams.items()}
-            prox_diam, _, _ = measure_cross_sectional_diameter(
-                cpr[0], AORTA_CROSS_SECTION_SPACING, diff_threshold=5
-            )
+            prox_diam, _, _ = measure_cross_sectional_diameter(cpr[0], AORTA_CROSS_SECTION_SPACING, diff_threshold=5)
             diams[f"{prefix}_prox_diam"] = prox_diam
             diam_data.update(diams)
     return diam_data
@@ -278,9 +254,7 @@ def _split_thoracic_using_cpr(cpr: np.ndarray, centerline: np.ndarray) -> tuple:
     """
     brach_start, subclavian_end, aorta_label = _define_aortic_arch_with_seg(cpr)
     if subclavian_end < brach_start:
-        logger.warning(
-            "Left Subclavian Artery found above Brachiocephalic Trunk. use centerline to split instead."
-        )
+        logger.warning("Left Subclavian Artery found above Brachiocephalic Trunk. use centerline to split instead.")
         return None, None, None
     # Separate each cpr
     asc_cpr, asc_centerline = cpr[:brach_start].copy(), centerline[:brach_start].copy()
@@ -307,18 +281,14 @@ def _define_aortic_arch_with_seg(cpr):
             brach_start = slice_idx
             break
     # Now find the last instance of the subclavian artery
-    for slice_idx, cross_section in enumerate(
-        cpr[::-1]
-    ):  # Go through in reverse so first appearance == last instance
+    for slice_idx, cross_section in enumerate(cpr[::-1]):  # Go through in reverse so first appearance == last instance
         if subclavian_label in cross_section:
             subclavian_end = cpr_length - slice_idx
             break
     return brach_start, subclavian_end, aorta_label
 
 
-def _split_thoracic_using_seg(
-    thoracic_aorta_seg: np.ndarray, cpr: np.ndarray, centerline: np.ndarray
-) -> tuple:
+def _split_thoracic_using_seg(thoracic_aorta_seg: np.ndarray, cpr: np.ndarray, centerline: np.ndarray) -> tuple:
     """The original way we split the thoracic aorta into ascending, arch, and descending regions using the segmentation
     :param thoracic_aorta_seg: the entire aortic segmentation
     :param cpr: the cpr numpy array
@@ -368,9 +338,7 @@ def _split_thoracic_using_seg(
     for i in range(len(desc_cpr)):
         if desc_centerline[i][0] >= split:
             desc.append(desc_cpr[i])
-            if (
-                i < min_desc_idx
-            ):  # This should only happen once, the first time the centerline is below the split
+            if i < min_desc_idx:  # This should only happen once, the first time the centerline is below the split
                 min_desc_idx = i
     if len(desc) > 0:
         desc_cpr = np.stack(desc, axis=0)

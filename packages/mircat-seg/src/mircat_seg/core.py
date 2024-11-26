@@ -59,9 +59,7 @@ def segment_niftis(
     validated_niftis = [{"image": nifti} for nifti in nifti_list]
     nifti_iter = iter(validated_niftis)
     torch_device = torch.device(device)
-    logger.info(
-        f'Running segmentation on {len(validated_niftis)} Nifti file{"s" if len(validated_niftis) > 1 else ""}'
-    )
+    logger.info(f'Running segmentation on {len(validated_niftis)} Nifti file{"s" if len(validated_niftis) > 1 else ""}')
     batch_num = 1
     total_batches = ceil(len(validated_niftis) / cache_num)
     while True:
@@ -69,12 +67,8 @@ def segment_niftis(
         if not batch:
             break
         for task in task_list:
-            logger.info(
-                f"Running {task} segmentation on batch {batch_num} of {total_batches}"
-            )
-            task_specific_segmentation(
-                batch, task, torch_device, sw_batch_size, num_dataloader_workers
-            )
+            logger.info(f"Running {task} segmentation on batch {batch_num} of {total_batches}")
+            task_specific_segmentation(batch, task, torch_device, sw_batch_size, num_dataloader_workers)
             collect()
         batch_num += 1
 
@@ -96,15 +90,11 @@ def task_specific_segmentation(
     """
     # Get the task-specific configurations
     task_config = torch_model_configs[task]
-    preprocessing, cpu_postprocessing, default_postprocessing = _create_transforms(
-        task_config, device
-    )
+    preprocessing, cpu_postprocessing, default_postprocessing = _create_transforms(task_config, device)
     dataloader = _create_dataloader(nifti_data, preprocessing, num_dataloader_workers)
     model = _load_model(task, device)
     # SlidingWindowInfererAdapt will automatically switch to CPU if cuda is out of memory
-    inferer = SlidingWindowInfererAdapt(
-        roi_size=task_config["patch_size"], sw_batch_size=sw_batch_size, overlap=0.5
-    )
+    inferer = SlidingWindowInfererAdapt(roi_size=task_config["patch_size"], sw_batch_size=sw_batch_size, overlap=0.5)
     # Run the inference using task configurations
     if device == torch.device("cpu"):
         autocast_device = "cpu"
@@ -127,9 +117,7 @@ def task_specific_segmentation(
                 # If the prediction is on CPU (== -1), we just go right to CPU postprocessing
                 if data["pred"].get_device() != -1:
                     try:
-                        out = [
-                            default_postprocessing(i) for i in decollate_batch(data)
-                        ][0]
+                        out = [default_postprocessing(i) for i in decollate_batch(data)][0]
                     except RuntimeError:
                         print("switching postprocessing to CPU")
                         preprocessing = _reset_preprocessing(preprocessing)
@@ -156,9 +144,7 @@ def task_specific_segmentation(
                     )
 
 
-def _create_transforms(
-    task_config: dict, device: torch.device
-) -> tuple[mt.Compose, mt.Compose, mt.Compose]:
+def _create_transforms(task_config: dict, device: torch.device) -> tuple[mt.Compose, mt.Compose, mt.Compose]:
     """Creates transforms for a specific task
     :param task_config: dictionary containing the configuration of the task
     :param device: the device to run postprocessing on (cpu or cuda)
@@ -169,9 +155,7 @@ def _create_transforms(
         preprocessing = mt.Compose(
             [
                 mt.LoadImaged(keys=["image"]),  # Load the image
-                mt.EnsureChannelFirstd(
-                    keys=["image"]
-                ),  # Make sure that the data is channels first format
+                mt.EnsureChannelFirstd(keys=["image"]),  # Make sure that the data is channels first format
                 # Threshold the hounsfield units to the training-specific range and normalize
                 mt.ThresholdIntensityd(
                     keys=["image"],
@@ -197,15 +181,9 @@ def _create_transforms(
                     allow_smaller=True,
                     select_fn=lambda x: x > task_config["crop_threshold"],
                 ),
-                mt.Orientationd(
-                    keys=["image"], axcodes="RAS"
-                ),  # Ensure the orientation is RAS
-                mt.Spacingd(
-                    keys=["image"], pixdim=task_config["spacing"], mode="bilinear"
-                ),
-                mt.EnsureTyped(
-                    keys=["image"], device=torch.device("cpu"), track_meta=True
-                ),
+                mt.Orientationd(keys=["image"], axcodes="RAS"),  # Ensure the orientation is RAS
+                mt.Spacingd(keys=["image"], pixdim=task_config["spacing"], mode="bilinear"),
+                mt.EnsureTyped(keys=["image"], device=torch.device("cpu"), track_meta=True),
             ]
         )
     else:
@@ -213,9 +191,7 @@ def _create_transforms(
         preprocessing = mt.Compose(
             [
                 mt.LoadImaged(keys=["image"]),  # Load the image
-                mt.EnsureChannelFirstd(
-                    keys=["image"]
-                ),  # Make sure that the data is channels first format
+                mt.EnsureChannelFirstd(keys=["image"]),  # Make sure that the data is channels first format
                 # Threshold the hounsfield units to the training-specific range and normalize
                 mt.ThresholdIntensityd(
                     keys=["image"],
@@ -241,16 +217,10 @@ def _create_transforms(
                     allow_smaller=True,
                     select_fn=lambda x: x > task_config["crop_threshold"],
                 ),
-                mt.Orientationd(
-                    keys=["image"], axcodes="RAS"
-                ),  # Ensure the orientation is RAS
-                mt.Spacingd(
-                    keys=["image"], pixdim=task_config["spacing"], mode="bilinear"
-                ),
+                mt.Orientationd(keys=["image"], axcodes="RAS"),  # Ensure the orientation is RAS
+                mt.Spacingd(keys=["image"], pixdim=task_config["spacing"], mode="bilinear"),
                 mt.Transposed(keys=["image"], indices=(0, 3, 2, 1)),
-                mt.EnsureTyped(
-                    keys=["image"], device=torch.device("cpu"), track_meta=True
-                ),
+                mt.EnsureTyped(keys=["image"], device=torch.device("cpu"), track_meta=True),
             ]
         )
     # This is the order of ops for either cuda or cpu. Will set device later
@@ -341,14 +311,10 @@ def _load_model(task: str, device: torch.device) -> torch.nn.Module:
             num_res_units=2,
             adn_ordering="NAD",
         ).to(device)
-        model.load_state_dict(
-            torch.load(f"{MODELS_DIR}/torch_{task}.pth", map_location=device)
-        )
+        model.load_state_dict(torch.load(f"{MODELS_DIR}/torch_{task}.pth", map_location=device))
     else:
         # The other two weights include the full model architecture as well
-        model = torch.load(f"{MODELS_DIR}/torch_{task}.pt", map_location=device).to(
-            device
-        )
+        model = torch.load(f"{MODELS_DIR}/torch_{task}.pt", map_location=device).to(device)
     # Set the model to eval
     model.eval()
     return model
@@ -369,9 +335,7 @@ def _reset_preprocessing(preprocessing: mt.Compose) -> mt.Compose:
     return preprocessing
 
 
-def _write_segmentation_to_file(
-    data: dict, image_meta_dict: dict, task: str
-) -> str | None:
+def _write_segmentation_to_file(data: dict, image_meta_dict: dict, task: str) -> str | None:
     """Write the predicted segmentation to a folder next to the original image
     :param data: the monai data dict
     :param image_meta_dict: the monai generated image meta information
@@ -423,15 +387,12 @@ class ErrorHandlingCacheDataset(CacheDataset):
         try:
             item = self.data[idx]
             first_random = self.transform.get_index_of_first(
-                lambda t: isinstance(t, mt.RandomizableTrait)
-                or not isinstance(t, mt.Transform)
+                lambda t: isinstance(t, mt.RandomizableTrait) or not isinstance(t, mt.Transform)
             )
             item = self.transform(item, end=first_random, threading=True)
 
             if self.as_contiguous:
-                item = mt.convert_to_contiguous(
-                    item, memory_format=torch.contiguous_format
-                )
+                item = mt.convert_to_contiguous(item, memory_format=torch.contiguous_format)
             if item["image"].shape[0] != 1:
                 nifti_name = self.data[idx]["image"]
                 logger.error(
@@ -444,11 +405,7 @@ class ErrorHandlingCacheDataset(CacheDataset):
                         "error_message": None,
                     },
                 )
-                return {
-                    "image": MetaTensor(
-                        torch.zeros([1, 10, 10, 10]), meta={"skip": True}
-                    )
-                }
+                return {"image": MetaTensor(torch.zeros([1, 10, 10, 10]), meta={"skip": True})}
             return item
         except Exception as e:
             nifti_name = self.data[idx]["image"]
@@ -462,9 +419,7 @@ class ErrorHandlingCacheDataset(CacheDataset):
                     "error_message": str(e),
                 },
             )
-            return {
-                "image": MetaTensor(torch.zeros([1, 10, 10, 10]), meta={"skip": True})
-            }
+            return {"image": MetaTensor(torch.zeros([1, 10, 10, 10]), meta={"skip": True})}
 
 
 def _remove_bad_cache_loads(batch):

@@ -32,12 +32,8 @@ def convert_dicom_folders_to_nifti(
     verbose : bool
         If True, verbose output will be printed
     """
-    converter = partial(
-        _process_dicom_folder, output_dir=output_dir, only_ax=only_ax, no_mip=no_mip
-    )
-    logger.info(
-        f"Converting {len(dicom_folders)} dicom folders to nifti with {num_workers} workers"
-    )
+    converter = partial(_process_dicom_folder, output_dir=output_dir, only_ax=only_ax, no_mip=no_mip)
+    logger.info(f"Converting {len(dicom_folders)} dicom folders to nifti with {num_workers} workers")
     start_time = time()
     with Pool(num_workers) as pool:
         if verbose:
@@ -52,14 +48,10 @@ def convert_dicom_folders_to_nifti(
         for _ in dicom_iterator:
             pass
     end_time = time()
-    logger.info(
-        f"Conversion of {len(dicom_folders)} dicom folders to nifti completed in {end_time - start_time:.2f}s"
-    )
+    logger.info(f"Conversion of {len(dicom_folders)} dicom folders to nifti completed in {end_time - start_time:.2f}s")
 
 
-def _process_dicom_folder(
-    dicom_folder: str, output_dir: Path, only_ax: bool, no_mip: bool
-) -> None:
+def _process_dicom_folder(dicom_folder: str, output_dir: Path, only_ax: bool, no_mip: bool) -> None:
     """Helper function to process a single dicom folder
     Parameters
     ----------
@@ -122,9 +114,7 @@ def update_header_and_stats(nifti: Path):
     nifti_as_dicom = DicomFolder(nifti_folder)
     dicom_files = nifti_as_dicom._find_dicoms_in_folder()
     # Some nifti folders will have a dicom with .dcm extension, others will not
-    if (
-        len(dicom_files) == 1
-    ):  # This will always be the case if .dcm extension is present
+    if len(dicom_files) == 1:  # This will always be the case if .dcm extension is present
         nifti_as_dicom.reference_dicom = dicom_files[0]
         nifti_as_dicom._generate_reference_dict()
     else:

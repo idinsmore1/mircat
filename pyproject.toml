@@ -28,3 +28,6 @@ mircat-stats = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/mircat-seg", "packages/mircat-stats"]
+
+[tool.ruff]
+line-length = 120

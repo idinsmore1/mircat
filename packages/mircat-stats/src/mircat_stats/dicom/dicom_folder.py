@@ -105,12 +105,8 @@ class DicomFolder:
             raise InsufficientDicomFilesError
         self.reference_dicom = dicom_files[0]
         self.reference_dicom_name = dicom_files[0].parts[-1]
-        self.series_numbers = set(
-            [getattr(dcmread(dicom), "SeriesNumber") for dicom in dicom_files]
-        )
-        self.series_name = _remove_accents(
-            getattr(dcmread(self.reference_dicom), "SeriesDescription", "")
-        )
+        self.series_numbers = set([getattr(dcmread(dicom), "SeriesNumber") for dicom in dicom_files])
+        self.series_name = _remove_accents(getattr(dcmread(self.reference_dicom), "SeriesDescription", ""))
 
     def _generate_reference_dict(self) -> None:
         "Load reference dicom header and generate a dictionary containing critical data"
@@ -199,9 +195,7 @@ class DicomFolder:
         )
         ref_data["is_airc"] = "ai-rad" in ref_data.get("series_name", "").lower()
         self.ref_data = ref_data
-        if all([x is None for x in ref_data.values()]) or any(
-            [ref_data.get(key) is None for key in naming_keys]
-        ):
+        if all([x is None for x in ref_data.values()]) or any([ref_data.get(key) is None for key in naming_keys]):
             raise IncompleteDicomReferenceError
 
     @timer
@@ -223,9 +217,7 @@ class DicomFolder:
         with (nifti_dir / "header_info.json").open("w") as f:
             json.dump(self.ref_data, f, indent=4)
         # Convert the dicoms to nifti
-        dicom2nifti.convert_directory(
-            self.path, nifti_dir, compression=True, reorient=True
-        )
+        dicom2nifti.convert_directory(self.path, nifti_dir, compression=True, reorient=True)
 
     def convert_to_nifti(self, output_dir: Path, only_ax: bool, no_mip: bool) -> None:
         """Converts the dicom folder to a nifti file.
@@ -270,17 +262,11 @@ class DicomFolder:
                     extra=extra_dict,
                 )
                 return
-            mrn, accession, series_name = itemgetter("mrn", "accession", "series_name")(
-                self.ref_data
-            )
+            mrn, accession, series_name = itemgetter("mrn", "accession", "series_name")(self.ref_data)
             first_two_mrn_digits = mrn[:2]
-            nifti_dir = (
-                output_dir / first_two_mrn_digits / mrn / accession / series_name
-            )
+            nifti_dir = output_dir / first_two_mrn_digits / mrn / accession / series_name
             _, convert_time = self._convert(nifti_dir)
-            nifti_files = [
-                f"{n}_{self.series_name}.nii.gz" for n in self.series_numbers
-            ]
+            nifti_files = [f"{n}_{self.series_name}.nii.gz" for n in self.series_numbers]
             # Update the extra_dict with the output directory and files
             extra_dict["converted"] = True
             extra_dict["output_dir"] = str(nifti_dir)
@@ -300,9 +286,7 @@ class DicomFolder:
             )
         except IncompleteDicomReferenceError:
             extra_dict["failed_reason"] = "incomplete_reference"
-            logger.error(
-                f"Dicom reference data is incomplete for {self.path}", extra=extra_dict
-            )
+            logger.error(f"Dicom reference data is incomplete for {self.path}", extra=extra_dict)
 
         except SameFileError as e:
             extra_dict["failed_reason"] = "same_file_error"

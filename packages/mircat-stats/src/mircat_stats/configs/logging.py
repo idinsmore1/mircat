@@ -75,8 +75,7 @@ def configure_logging(logger, log_file_path, verbose: bool):
             # colorize=True,
             format="<red>{time: DD-MM-YYYY -> HH:mm:ss}</red> <level>{message}</level>",
             level="WARNING",
-            filter=lambda record: record["level"].name
-            not in ["DEBUG", "INFO", "SUCCESS"],
+            filter=lambda record: record["level"].name not in ["DEBUG", "INFO", "SUCCESS"],
             enqueue=True,
         )
     else:

@@ -12,9 +12,7 @@ def mircat_seg():
 
 def mircat_copy_models():
     parser = argparse.ArgumentParser(description="Copy models to the correct location")
-    parser.add_argument(
-        "model_dir", help="Directory containing models to copy", type=Path
-    )
+    parser.add_argument("model_dir", help="Directory containing models to copy", type=Path)
     args = parser.parse_args()
     model_dir = args.model_dir
     if not model_dir.is_dir():

@@ -17,9 +17,7 @@ def mircat():
     Convert dicoms to niftis, segment niftis, and calculate statistics.
     """
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        "-q", "--quiet", help="Decrease output verbosity", action="store_true"
-    )
+    parser.add_argument("-q", "--quiet", help="Decrease output verbosity", action="store_true")
     subparsers = parser.add_subparsers(dest="command", required=True)
     # Create the 'convert' subparser
     convert_parser = subparsers.add_parser("convert", help="Convert DICOM files")
@@ -38,9 +36,7 @@ def mircat():
         help="Only convert axial dicom series",
         action="store_true",
     )
-    convert_parser.add_argument(
-        "-nm", "--no-mip", help="Do not convert likely mip series", action="store_true"
-    )
+    convert_parser.add_argument("-nm", "--no-mip", help="Do not convert likely mip series", action="store_true")
     convert_parser.add_argument(
         "-th",
         "--threads",
@@ -50,9 +46,7 @@ def mircat():
     )
     # Set up segment subparser
     # Create the 'segment' subparser
-    seg_parser = subparsers.add_parser(
-        "segment", help="Segment NIfTI files using neural network models"
-    )
+    seg_parser = subparsers.add_parser("segment", help="Segment NIfTI files using neural network models")
     seg_parser.add_argument(
         "niftis",
         type=Path,
@@ -102,9 +96,7 @@ def mircat():
         help="Number of workers to load imaging data. Default=4",
     )
     # Set up stats parser
-    stats_parser = subparsers.add_parser(
-        "stats", help="Calculate statistics for NIfTI files"
-    )
+    stats_parser = subparsers.add_parser("stats", help="Calculate statistics for NIfTI files")
     stats_parser.add_argument(
         "niftis",
         type=Path,
@@ -150,12 +142,8 @@ def mircat():
         help="Update the header and stats data for a NIfTI file to the latest version",
     )
     update_parser.add_argument("niftis", help="Path to NIfTI files", type=Path)
-    update_parser.add_argument(
-        "-n", "--num-workers", help="Number of workers", type=int, default=1
-    )
-    update_parser.add_argument(
-        "-th", "--threads", help="Number of threads", type=int, default=1
-    )
+    update_parser.add_argument("-n", "--num-workers", help="Number of workers", type=int, default=1)
+    update_parser.add_argument("-th", "--threads", help="Number of threads", type=int, default=1)
 
     args = parser.parse_args()
     args.verbose = not args.quiet

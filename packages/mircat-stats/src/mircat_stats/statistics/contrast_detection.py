@@ -67,9 +67,7 @@ def predict_contrast(nifti: MircatNifti) -> dict[str : str | str : float]:
                 struct = np.ones((1, 1, 1))
             else:
                 struct = np.ones((3, 3, 3))
-            eroded_arr = ndi.binary_erosion(binary_arr, structure=struct).astype(
-                np.uint8
-            )
+            eroded_arr = ndi.binary_erosion(binary_arr, structure=struct).astype(np.uint8)
             if name == "portal_and_splenic_vein":
                 if eroded_arr.sum() < 500:
                     eroded_arr = binary_arr
@@ -83,9 +81,7 @@ def predict_contrast(nifti: MircatNifti) -> dict[str : str | str : float]:
                         hull = _fill_hull(mask)
                         hull = hull * (mask == 0)
                         struct = np.ones((3, 3, 3))
-                        hull = ndi.binary_erosion(hull, structure=struct).astype(
-                            np.uint8
-                        )
+                        hull = ndi.binary_erosion(hull, structure=struct).astype(np.uint8)
                         hull_sitk = sitk.GetImageFromArray(hull)
                         hull_sitk.CopyInformation(seg)
                         binary_data[f"{name}_hull"] = hull_sitk
@@ -101,15 +97,9 @@ def predict_contrast(nifti: MircatNifti) -> dict[str : str | str : float]:
                     hull_sitk.CopyInformation(seg)
                     binary_data[f"{name}_hull"] = hull_sitk
         # Get the statistics for each label
-        statistics = {
-            label: _get_sitk_stats(binary_data[label], img) for label in binary_data
-        }
-        statistics["aorta_portal_vein"] = (
-            statistics["aorta"][:3] - statistics["portal_and_splenic_vein"][:3]
-        )
-        statistics["aorta_ivc"] = (
-            statistics["aorta"][:3] - statistics["inferior_vena_cava"][:3]
-        )
+        statistics = {label: _get_sitk_stats(binary_data[label], img) for label in binary_data}
+        statistics["aorta_portal_vein"] = statistics["aorta"][:3] - statistics["portal_and_splenic_vein"][:3]
+        statistics["aorta_ivc"] = statistics["aorta"][:3] - statistics["inferior_vena_cava"][:3]
         features = []
         feature_list = FEATURE_LIST
         contrast_prediction_dict = CONTRAST_PREDICTION_DICT

@@ -28,9 +28,7 @@ class Segmentation:
     hold them in a single object. This is useful for specific morphology-based statistics
     """
 
-    def __init__(
-        self, nifti: MircatNifti, seg_names: list[str], reload_gaussian: bool = False
-    ):
+    def __init__(self, nifti: MircatNifti, seg_names: list[str], reload_gaussian: bool = False):
         """Initialize Segmentation class.
 
         This class handles filtering and potentially analysis of segmented CT images.
@@ -72,9 +70,7 @@ class Segmentation:
         self.seg_info = seg_info
         self.model = model
 
-    def _filter_to_segmentation(
-        self, nifti: MircatNifti, reload_gaussian: bool
-    ) -> sitk.Image:
+    def _filter_to_segmentation(self, nifti: MircatNifti, reload_gaussian: bool) -> sitk.Image:
         """Filter input nifti to segmented regions.
 
         This method applies filtering to convert a nifti image into segmented regions.
@@ -101,9 +97,7 @@ class Segmentation:
         labels = list(self.seg_info.keys())
         label_indices = [v["idx"] for v in self.seg_info.values()]
 
-        label_map = {
-            old_idx: new_idx for new_idx, old_idx in enumerate(label_indices, start=1)
-        }
+        label_map = {old_idx: new_idx for new_idx, old_idx in enumerate(label_indices, start=1)}
         seg_arr = sitk.GetArrayFromImage(complete).astype(np.uint8)
         mask = np.isin(seg_arr, label_indices)
         seg_arr[~mask] = 0
@@ -122,15 +116,11 @@ class Segmentation:
         segmentation.CopyInformation(complete)
         if reload_gaussian:
             # Get cleaner segmentation using gaussian smoothing
-            segmentation = _resample(
-                segmentation, (1.0, 1.0, 1.0), is_label=True, gaussian=True
-            )
+            segmentation = _resample(segmentation, (1.0, 1.0, 1.0), is_label=True, gaussian=True)
         self.segmentation = _filter_largest_components(segmentation, mapped_indices)
         self.seg_names = labels
 
-    def extract_segmentation_bounding_box(
-        self, padding: tuple[int] | int = (0, 0, 0)
-    ) -> tuple[sitk.Image, sitk.Image]:
+    def extract_segmentation_bounding_box(self, padding: tuple[int] | int = (0, 0, 0)) -> tuple[sitk.Image, sitk.Image]:
         """
         Extract the bounding box of the segmentation with a given amount of padding around it.
         Args
@@ -142,9 +132,7 @@ class Segmentation:
         tuple[sitk.Image, sitk.Image]
             The cropped segmentation and CT image
         """
-        assert (
-            self.segmentation.GetSize() == self.original_ct.GetSize()
-        ), SegmentationSizeDoesNotMatchError(
+        assert self.segmentation.GetSize() == self.original_ct.GetSize(), SegmentationSizeDoesNotMatchError(
             "Segmentation and CT image must have the same size"
         )
         if isinstance(padding, int):

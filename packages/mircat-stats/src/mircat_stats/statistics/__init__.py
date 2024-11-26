@@ -69,14 +69,10 @@ def calculate_nifti_stats(
             ):
                 single_nifti_stats(nifti, task_list, mark_complete, gaussian)
     stats_end = time()
-    logger.info(
-        "Statistics processing completed in {:.2f}s".format(stats_end - stats_start)
-    )
+    logger.info("Statistics processing completed in {:.2f}s".format(stats_end - stats_start))
 
 
-def single_nifti_stats(
-    input_nifti: str, task_list: list[str], mark_complete: bool, gaussian: bool
-) -> None:
+def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bool, gaussian: bool) -> None:
     """Calculate statistics for a single nifti file
     Parameters
     ----------

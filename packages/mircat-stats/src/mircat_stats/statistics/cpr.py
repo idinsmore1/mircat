@@ -34,15 +34,10 @@ def create_straightened_cpr(
             vessel, center_point, normal_vector, cross_section_xy, resolution, is_binary
         )
         if is_binary:
-            cross_section, touches_border = _postprocess_cross_section(
-                cross_section, sigma
-            )
-            num_touching += touches_border
+            cross_section = _postprocess_cross_section(cross_section, sigma)
         cpr.append(cross_section)
     if num_touching > 0:
-        logger.debug(
-            f"Number of border touching cross-sections dropped: {num_touching}"
-        )
+        logger.debug(f"Number of border touching cross-sections dropped: {num_touching}")
     cpr = np.stack(cpr, axis=0)
     return cpr
 
@@ -81,9 +76,7 @@ def _compute_orthogonal_vectors(vector: np.ndarray) -> tuple[np.ndarray, np.ndar
         return v1, v2
 
 
-def _extract_cross_sectional_slice(
-    arr, point, tangent_vector, slice_size, resolution, is_binary
-):
+def _extract_cross_sectional_slice(arr, point, tangent_vector, slice_size, resolution, is_binary):
     """
     Extract a 2D cross-sectional slice from a 3D array given a point and its tangent vector.
 
@@ -105,69 +98,63 @@ def _extract_cross_sectional_slice(
     x_grid, y_grid = np.meshgrid(x_lin, y_lin)
     # Map the grid points back to the 3D array indices
     slice_points = point + x_grid[..., np.newaxis] * v1 + y_grid[..., np.newaxis] * v2
+    x = np.arange(arr.shape[0])
+    y = np.arange(arr.shape[1])
+    z = np.arange(arr.shape[2])
     if is_binary:
-        slice_points = np.rint(slice_points).astype(int)
-        # Initialize an empty slice with zeros (padding)
-        slice_2d = np.zeros(
-            (int(height / resolution), int(width / resolution)), dtype=arr.dtype
-        )
-        if arr.min() != 0:
-            slice_2d = slice_2d + arr.min()
-        # Compute valid index ranges considering the boundaries
-        valid_x = (slice_points[..., 0] >= 0) & (slice_points[..., 0] < arr.shape[0])
-        valid_y = (slice_points[..., 1] >= 0) & (slice_points[..., 1] < arr.shape[1])
-        valid_z = (slice_points[..., 2] >= 0) & (slice_points[..., 2] < arr.shape[2])
-        valid_indices = valid_x & valid_y & valid_z
-        # Extract values for valid indices and assign to the slice, leave zeros elsewhere
-        valid_points = slice_points[valid_indices]
-        slice_2d[valid_indices] = arr[
-            valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]
-        ]
+        # Perform nearest interpolation
+        method = "nearest"
+        fill_value = 0
     else:
-        # Create a grid of the original array coordinates
-        x = np.arange(arr.shape[0])
-        y = np.arange(arr.shape[1])
-        z = np.arange(arr.shape[2])
-        # Perform trilinear interpolation
-        slice_2d = interpn(
-            (x, y, z),
-            arr,
-            slice_points,
-            method="linear",
-            bounds_error=False,
-            fill_value=arr.min(),
-        )
+        # Perform linear interpolation in each axis
+        method = "linear"
+        fill_value = arr.min()
+    # Perform the interpolation
+    slice_2d = interpn(
+        (x, y, z),
+        arr,
+        slice_points,
+        method=method,
+        bounds_error=False,
+        fill_value=fill_value,
+    )
     return slice_2d
 
 
-def _postprocess_cross_section(cross_section: np.ndarray, sigma: int) -> np.ndarray:
+def _postprocess_cross_section(cross_section: np.ndarray, sigma: int) -> tuple[np.ndarray, int]:
     """Fill small gaps within the cross-section and apply a gaussian filter to smooth the edges
     :param cross_section: the extracted cross-section from _extract_cross_sectional_slice
     :param sigma: the gaussian kernel sigma
     :return: the smoothed cross-section
     """
     cross_section_labels = [label for label in np.unique(cross_section) if label > 0]
+    if len(cross_section_labels) == 0:
+        return cross_section
     output_cross_section = np.zeros_like(cross_section, dtype=np.uint8)
     for label in cross_section_labels:
         center_label = _filter_label_regions(cross_section, label)
         center_label = remove_small_holes(center_label)
         center_label = gaussian(center_label, sigma=sigma).round(0)
-        output_cross_section[center_label == 1] = (
-            label  # Assign the output of the binary to the appropriate label
-        )
-        # Check if the center label touches the image border
-    height, width = output_cross_section.shape
-    borders = {"top": 0, "bottom": height - 1, "left": 0, "right": width - 1}
-    touches_border = {
-        "top": np.any(center_label[borders["top"], :]),
-        "bottom": np.any(center_label[borders["bottom"], :]),
-        "left": np.any(center_label[:, borders["left"]]),
-        "right": np.any(center_label[:, borders["right"]]),
-    }
-    touching_any = any(touches_border.values())
-    if touching_any:
-        return np.zeros_like(cross_section), 1
-    return output_cross_section, 0
+        # Assign the output of the binary to the appropriate label
+        output_cross_section[center_label == 1] = label  
+    # # Check if the center label touches the image border
+    # height, width = output_cross_section.shape
+    # main_label = (output_cross_section == 1).astype(int)
+    # if np.any(main_label):
+    #     borders = {"top": 0, "bottom": height - 1, "left": 0, "right": width - 1}
+    #     touches_border = {
+    #         "top": np.any(main_label[borders["top"], :]),
+    #         "bottom": np.any(main_label[borders["bottom"], :]),
+    #         "left": np.any(main_label[:, borders["left"]]),
+    #         "right": np.any(main_label[:, borders["right"]]),
+    #     }
+    #     touching_any = any(touches_border.values())
+    #     if touching_any:
+    #         return np.zeros_like(cross_section), 1
+    #     main_region = _get_regions(main_label)
+    #     solidity = main_region[0].solidity
+    #     print(solidity)
+    return output_cross_section
 
 
 def _filter_label_regions(cross_section: np.ndarray, label: int) -> np.ndarray:
@@ -176,15 +163,9 @@ def _filter_label_regions(cross_section: np.ndarray, label: int) -> np.ndarray:
     :param label: the label to filter
     :return: a numpy array containing the filtered cross-section
     """
-    tmp_cross_section = (
-        cross_section.copy()
-    )  # Create a temporary array, so we don't change the original cross-section
-    tmp_cross_section[tmp_cross_section != label] = (
-        0  # set anything that is not the desired label to 0
-    )
-    tmp_cross_section[tmp_cross_section == label] = (
-        1  # set the label to 1 for easier replacement later
-    )
+    tmp_cross_section = cross_section.copy()  # Create a temporary array, so we don't change the original cross-section
+    tmp_cross_section[tmp_cross_section != label] = 0  # set anything that is not the desired label to 0
+    tmp_cross_section[tmp_cross_section == label] = 1  # set the label to 1 for easier replacement later
     regions = _get_regions(tmp_cross_section)
     if len(regions) == 0:
         centered_label = np.zeros_like(cross_section)
@@ -195,9 +176,7 @@ def _filter_label_regions(cross_section: np.ndarray, label: int) -> np.ndarray:
     return centered_label > 0
 
 
-def _closest_to_centroid(
-    cross_section: np.ndarray, regions: list[RegionProperties]
-) -> np.ndarray:
+def _closest_to_centroid(cross_section: np.ndarray, regions: list[RegionProperties]) -> np.ndarray:
     """Filter a cross-section label using skimage.measure.regionprops to the region closest to the center
     :param cross_section: the cross-section array
     :param regions: the list output from skimage.measure.regionprops
@@ -205,9 +184,7 @@ def _closest_to_centroid(
     """
     center_of_plane = np.array(cross_section.shape) / 2.0
     centroids = [np.array(region.centroid) for region in regions]
-    distance_per_region = np.asarray(
-        [np.linalg.norm(centroid - center_of_plane) for centroid in centroids]
-    )
+    distance_per_region = np.asarray([np.linalg.norm(centroid - center_of_plane) for centroid in centroids])
     min_distance_region_idx = int(np.argmin(distance_per_region))
     center_region = regions[min_distance_region_idx]
     center_label = np.zeros_like(cross_section)
@@ -216,9 +193,7 @@ def _closest_to_centroid(
 
 
 ######### CPR Measurement Functions #############
-def measure_largest_cpr_diameter(
-    cpr: np.ndarray, pixel_spacing: tuple, diff_threshold: int = 5
-) -> dict:
+def measure_largest_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple, diff_threshold: int = 5) -> dict:
     """Find the largest average cpr diameter
     :param cpr: a binary array containing the entire curved planar reformation to be measured
     :param pixel_spacing: the x, y pixel spacing for each cross-section
@@ -257,9 +232,7 @@ def measure_mid_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple) -> dict:
     len_cpr = len(cpr)
     midslice = len_cpr // 2
     if len_cpr > 0:
-        avg_diam, _, _ = measure_cross_sectional_diameter(
-            cpr[midslice], pixel_spacing, diff_threshold=5
-        )
+        avg_diam, _, _ = measure_cross_sectional_diameter(cpr[midslice], pixel_spacing, diff_threshold=5)
     else:
         avg_diam = None
     return {"mid_diam": avg_diam}
@@ -306,18 +279,12 @@ def _get_cross_section_endpoints(
 ) -> tuple[tuple[tuple, tuple], tuple[tuple, tuple]]:
     centroid = region.centroid
     orientation = region.orientation
-    major_endpoints = _get_axis_endpoints(
-        centroid, orientation, region.axis_major_length
-    )
-    minor_endpoints = _get_axis_endpoints(
-        centroid, orientation, region.axis_minor_length
-    )
+    major_endpoints = _get_axis_endpoints(centroid, orientation, region.axis_major_length)
+    minor_endpoints = _get_axis_endpoints(centroid, orientation, region.axis_minor_length)
     return major_endpoints, minor_endpoints
 
 
-def _get_axis_endpoints(
-    centroid: np.array, orientation: float, axis_length: float
-) -> tuple[tuple, tuple]:
+def _get_axis_endpoints(centroid: np.array, orientation: float, axis_length: float) -> tuple[tuple, tuple]:
     """Calculate the endpoints of the axis of a cross-section region
     :param centroid: the region.centroid
     :param orientation: the region.orientation
