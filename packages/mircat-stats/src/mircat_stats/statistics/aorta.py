@@ -72,6 +72,7 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
         return aorta_stats
 
     if abdominal:
+        logger.debug("Measuring abdominal aorta")
         try:
             start, end = find_region_endpoints(region_vert_map["abdominal"])
             abd_stats = measure_aorta_region(start, end, is_thoracic=False, region="abd_aorta")
@@ -79,6 +80,7 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
         except Exception as e:
             logger.error(f"Error measuring abdominal aorta: {e}")
     if thoracic:
+        logger.debug("Measuring thoracic aorta")
         try:
             start, end = find_region_endpoints(region_vert_map["thoracic"])
             thor_stats = measure_aorta_region(start, end, is_thoracic=True)
@@ -86,6 +88,7 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
         except Exception as e:
             logger.error(f"Error measuring thoracic aorta: {e}")
     elif descending:
+        logger.debug("Measuring descending aorta")
         try:
             start, end = find_region_endpoints(region_vert_map["descending"])
             desc_stats = measure_aorta_region(start, end, is_thoracic=False, region="desc_aorta")

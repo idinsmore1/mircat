@@ -2,6 +2,8 @@
 *.gz
 *.pth
 *.pt
+*.ipynb
+src/tests/
 # Byte-compiled / optimized / DLL files
 data/
 __pycache__/

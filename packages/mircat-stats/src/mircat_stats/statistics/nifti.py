@@ -86,14 +86,12 @@ class MircatNifti:
             self._load_stats()
         else:
             self.stats_exist = False
-            self.vert_midlines = {}
         self._load_original_ct()
         self._check_seg_files(task_list)
         self._load_seg_arrays(task_list, gaussian)
         self._check_and_load_header()
         # Calculate the vertebral midlines as reference points in the segmentations
-        if self.vert_midlines == {}:
-            self._get_vertebra_midlines(gaussian)
+        self._get_vertebra_midlines(gaussian)
 
     def _check_and_load_header(self) -> None:
         if self.header_file.exists():
