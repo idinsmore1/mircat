@@ -2,6 +2,7 @@
 *.gz
 *.pth
 *.pt
+*.ipynb
 # Byte-compiled / optimized / DLL files
 data/
 __pycache__/

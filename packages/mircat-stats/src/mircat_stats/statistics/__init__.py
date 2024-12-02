@@ -187,7 +187,8 @@ def single_nifti_stats(
         elif set(task_list) == set(["total", "contrast", "aorta", "tissues"]):
             all_completed = True
         elif nifti.stats_exist:
-            all_stats.update(nifti.stats)
+            nifti.stats.update(all_stats)
+            all_stats = nifti.stats
             if (
                 all_stats.get("total_completed")
                 and all_stats.get("contrast_completed")
