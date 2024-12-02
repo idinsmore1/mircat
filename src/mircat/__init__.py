@@ -6,6 +6,7 @@ from mircat_seg import segment_niftis
 from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
 from mircat_stats.statistics import calculate_nifti_stats
 from mircat_stats.configs.logging import configure_logging
+from mircat_stats.configs import set_num_threads
 
 
 def mircat():
@@ -147,6 +148,7 @@ def mircat():
 
     args = parser.parse_args()
     args.verbose = not args.quiet
+    set_num_threads(args.threads)
     threadpool_limits(args.threads)
     ## Logic for selection
     if args.command == "convert":
