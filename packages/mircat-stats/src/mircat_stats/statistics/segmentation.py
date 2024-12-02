@@ -28,7 +28,7 @@ class Segmentation:
     hold them in a single object. This is useful for specific morphology-based statistics
     """
 
-    def __init__(self, nifti: MircatNifti, seg_names: list[str], reload_gaussian: bool = False):
+    def __init__(self, nifti: MircatNifti, seg_names: list[str]):
         """Initialize Segmentation class.
 
         This class handles filtering and potentially analysis of segmented CT images.
@@ -52,7 +52,7 @@ class Segmentation:
         self.seg_folder = nifti.seg_folder
         self.seg_names = seg_names
         self._find_seg_model()
-        self._filter_to_segmentation(nifti, reload_gaussian)
+        self._filter_to_segmentation(nifti)
 
     def _find_seg_model(self):
         seg_info = {}
@@ -70,7 +70,7 @@ class Segmentation:
         self.seg_info = seg_info
         self.model = model
 
-    def _filter_to_segmentation(self, nifti: MircatNifti, reload_gaussian: bool) -> sitk.Image:
+    def _filter_to_segmentation(self, nifti: MircatNifti) -> sitk.Image:
         """Filter input nifti to segmented regions.
 
         This method applies filtering to convert a nifti image into segmented regions.
@@ -78,22 +78,16 @@ class Segmentation:
 
         Args:
             nifti (MircatNifti): Input nifti image to be segmented.
-            reload_gaussian (bool): Whether to reload the segmentation using gaussian smoothing. Useful if you loaded the segmentation without smoothing.
 
         Returns:
             sitk.Image: Filtered image containing segmented regions.
         """
         if self.model == "total":
             complete = nifti.total_seg
-            seg_file = nifti.seg_files["total"]
         elif self.model == "body":
             complete = nifti.body_seg
-            seg_file = nifti.seg_files["body"]
         elif self.model == "tissues":
             complete = nifti.tissues_seg
-            seg_file = nifti.seg_files["tissues"]
-        if reload_gaussian:
-            complete = sitk.ReadImage(seg_file)
         labels = list(self.seg_info.keys())
         label_indices = [v["idx"] for v in self.seg_info.values()]
 
@@ -114,9 +108,6 @@ class Segmentation:
             labels = [labels[idx - 1] for idx in mapped_indices]
         segmentation = sitk.GetImageFromArray(seg_arr)
         segmentation.CopyInformation(complete)
-        if reload_gaussian:
-            # Get cleaner segmentation using gaussian smoothing
-            segmentation = _resample(segmentation, (1.0, 1.0, 1.0), is_label=True, gaussian=True)
         self.segmentation = _filter_largest_components(segmentation, mapped_indices)
         self.seg_names = labels
 

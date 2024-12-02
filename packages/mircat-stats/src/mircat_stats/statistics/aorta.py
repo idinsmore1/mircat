@@ -25,14 +25,12 @@ ROOT_LENGTH = 10
 
 
 @timer
-def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
+def calculate_aorta_stats(nifti: MircatNifti) -> dict:
     """Calculate the statistics for the aorta
     Parameters
     ----------
     nifti : MircatNifti
         The nifti file to calculate statistics for
-    vert_midlines : dict
-        The vertebral midlines
     Returns
     -------
     dict[str: float]
@@ -59,7 +57,6 @@ def calculate_aorta_stats(nifti: MircatNifti, reload_gaussian: bool) -> dict:
         seg = Segmentation(
             nifti,
             ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"],
-            reload_gaussian=reload_gaussian,
         ).segmentation
         measure_aorta_region = partial(_measure_aorta_region, img, seg)
         find_region_endpoints = partial(_find_aortic_region_endpoints, vert_midlines=vert_midlines)

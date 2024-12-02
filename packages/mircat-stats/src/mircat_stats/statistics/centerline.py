@@ -66,7 +66,7 @@ def skeletonize_vessel(
     :return: a tuple containing the centerline vertices and edges
     """
     # These are the 2 necessary parameters for teasar algorithm
-    teasar_params = {"const": 80, "scale": 1.0}
+    teasar_params = {"const": 40, "scale": 1.5}
     if kwargs:
         _validate_skeletonize_kwargs(kwargs)
         teasar_kwargs = _extract_teasar_kwargs(kwargs)
