@@ -1,4 +1,4 @@
-diam_names = ["prox_diam", "mid_diam", "avg_diam", "major_diam", "minor_diam"]
+diam_names = ["prox_diam", "mid_diam", "dist_diam", "avg_diam", "major_diam", "minor_diam"]
 stats_output_keys = [
     "nifti_path",
     "mrn",

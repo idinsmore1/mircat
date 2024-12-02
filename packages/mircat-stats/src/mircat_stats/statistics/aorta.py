@@ -143,12 +143,15 @@ def _measure_aorta_region(
         diam_data = _measure_thoracic_diameters(region_seg, cpr, centerline)
         region_stats.update(diam_data)
     else:
-        cpr = cpr[1:]  # remove the first slice to ignore oblong starting slices
+        cpr = cpr[1:-1]  # remove the first and last slices to ignore oblong shapes
         diam_data = measure_largest_cpr_diameter(cpr, cross_section_spacing)
         mid_diam = measure_mid_cpr_diameter(cpr, cross_section_spacing)
         diam_data.update(mid_diam)
         prox_diam_data = measure_cross_sectional_diameter(cpr[0], AORTA_CROSS_SECTION_SPACING, diff_threshold=5)
         prox_diam = prox_diam_data['max_diam']
+        dist_diam_data = measure_cross_sectional_diameter(cpr[-1], AORTA_CROSS_SECTION_SPACING, diff_threshold=5)
+        dist_diam = dist_diam_data['max_diam']
+        diam_data['dist_diam'] = dist_diam
         diam_data['prox_diam'] = prox_diam
         diam_data = {f"{region}_{k}": v for k, v in diam_data.items()}
         region_stats.update(diam_data)
