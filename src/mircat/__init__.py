@@ -59,7 +59,7 @@ def mircat():
         type=str,
         nargs="+",
         default=["total", "tissues", "body"],
-        help='List of segmentation tasks to perform. Default = ["total", "tissues", "body"]',
+        help='List of segmentation tasks to perform. Default = ["total", "tissues", "body"]. Also has "cardiac"',
     )
     seg_parser.add_argument(
         "-th",

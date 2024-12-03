@@ -43,7 +43,7 @@ def segment_niftis(
 ) -> None:
     """Run inference on the given list of NIfTI files for a set of segmentation tasks.
     :param nifti_list: the list of NIfTI files to segment
-    :param task_list: the list of tasks to run ['total', 'tissues', 'body']
+    :param task_list: the list of tasks to run ['total', 'tissues', 'body', 'cardiac']
     :param device: string defining the device to run model on
     :param cache_num: the number of NIfTI files to cache at one time for inference
     :param sw_batch_size: the sliding window batch size during inference
