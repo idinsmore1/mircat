@@ -98,7 +98,7 @@ def _extract_cross_sectional_slice(arr, point, tangent_vector, slice_size, resol
     x_grid, y_grid = np.meshgrid(x_lin, y_lin)
     # Map the grid points back to the 3D array indices
     slice_points = point + x_grid[..., np.newaxis] * v1 + y_grid[..., np.newaxis] * v2
-    
+    # This is way faster for binary and the outcomes are practically identical
     if is_binary:
         slice_points = np.rint(slice_points).astype(int)
         # Initialize an empty slice with zeros (padding)
