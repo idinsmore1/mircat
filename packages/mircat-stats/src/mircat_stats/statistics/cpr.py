@@ -98,26 +98,41 @@ def _extract_cross_sectional_slice(arr, point, tangent_vector, slice_size, resol
     x_grid, y_grid = np.meshgrid(x_lin, y_lin)
     # Map the grid points back to the 3D array indices
     slice_points = point + x_grid[..., np.newaxis] * v1 + y_grid[..., np.newaxis] * v2
-    x = np.arange(arr.shape[0])
-    y = np.arange(arr.shape[1])
-    z = np.arange(arr.shape[2])
+    
     if is_binary:
-        # Perform nearest neighbor interpolation in each axis and fill with 0
-        method = 'nearest'
-        fill_value = 0
+        slice_points = np.rint(slice_points).astype(int)
+        # Initialize an empty slice with zeros (padding)
+        slice_2d = np.zeros(
+            (int(height / resolution), int(width / resolution)), dtype=arr.dtype
+        )
+        if arr.min() != 0:
+            slice_2d = slice_2d + arr.min()
+        # Compute valid index ranges considering the boundaries
+        valid_x = (slice_points[..., 0] >= 0) & (slice_points[..., 0] < arr.shape[0])
+        valid_y = (slice_points[..., 1] >= 0) & (slice_points[..., 1] < arr.shape[1])
+        valid_z = (slice_points[..., 2] >= 0) & (slice_points[..., 2] < arr.shape[2])
+        valid_indices = valid_x & valid_y & valid_z
+        # Extract values for valid indices and assign to the slice, leave zeros elsewhere
+        valid_points = slice_points[valid_indices]
+        slice_2d[valid_indices] = arr[
+            valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]
+        ]
     else:
         # Perform linear interpolation in each axis and fill with min value
         method = "linear"
         fill_value = arr.min()
-    # Perform the interpolation
-    slice_2d = interpn(
-        (x, y, z),
-        arr,
-        slice_points,
-        method=method,
-        bounds_error=False,
-        fill_value=fill_value,
-    )
+        x = np.arange(arr.shape[0])
+        y = np.arange(arr.shape[1])
+        z = np.arange(arr.shape[2])
+        # Perform the interpolation
+        slice_2d = interpn(
+            (x, y, z),
+            arr,
+            slice_points,
+            method=method,
+            bounds_error=False,
+            fill_value=fill_value,
+        )
     return slice_2d
 
 
@@ -212,16 +227,16 @@ def measure_largest_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple, diff_thr
         data = measure_cross_sectional_diameter(
             cross_section, pixel_spacing, diff_threshold
         )
-        is_convex = data['solidity'] >= solidity_threshold
-        is_circular = data['circularity'] >= circularity_threshold and data['circularity'] <= 1.1
-        is_not_elliptical = data['eccentricity'] <= eccentricity_threshold
-        if is_convex and is_circular and is_not_elliptical:
-            avg_diam = data['max_diam']
-            major_diam = data['major_diam']
-            minor_diam = data['minor_diam']
-            avg_diams.append(avg_diam)
-            major_diams.append(major_diam)
-            minor_diams.append(minor_diam)
+        # is_convex = data['solidity'] >= solidity_threshold
+        # is_circular = data['circularity'] >= circularity_threshold and data['circularity'] <= 1.1
+        # is_not_elliptical = data['eccentricity'] <= eccentricity_threshold
+        # if is_convex and is_circular and is_not_elliptical:
+        avg_diam = data['max_diam']
+        major_diam = data['major_diam']
+        minor_diam = data['minor_diam']
+        avg_diams.append(avg_diam)
+        major_diams.append(major_diam)
+        minor_diams.append(minor_diam)
     if avg_diams:
         largest_idx = np.argmax(avg_diams)
         diam_dict = {

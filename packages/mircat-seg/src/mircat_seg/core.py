@@ -94,7 +94,7 @@ def task_specific_segmentation(
     dataloader = _create_dataloader(nifti_data, preprocessing, num_dataloader_workers)
     model = _load_model(task, device)
     # SlidingWindowInfererAdapt will automatically switch to CPU if cuda is out of memory
-    inferer = SlidingWindowInfererAdapt(roi_size=task_config["patch_size"], sw_batch_size=sw_batch_size, overlap=0.5)
+    inferer = SlidingWindowInfererAdapt(roi_size=task_config["patch_size"], sw_batch_size=sw_batch_size, overlap=0.5, mode='gaussian')
     # Run the inference using task configurations
     if device == torch.device("cpu"):
         autocast_device = "cpu"
