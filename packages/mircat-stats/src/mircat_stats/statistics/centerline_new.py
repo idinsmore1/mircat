@@ -2,7 +2,7 @@ import numpy as np
 
 from loguru import logger
 from kimimaro import skeletonize
-from scipy.interpolate import splprep, splev
+from scipy.interpolate import splprep, splev, CubicSpline
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import savgol_filter
 from mircat_stats.statistics.cpr import _compute_tangent_vectors
@@ -69,6 +69,9 @@ class Centerline:
 
     def __len__(self) -> int:
         return len(self.centerline)
+    
+    def __eq__(self, value: object) -> bool:
+        return np.array_equal(self.centerline, value)
     
     def create_centerline(self, segmentation: np.ndarray, **kwargs) -> None:
         """Create a centerline on the segmentation and set it as self.centerline
@@ -190,6 +193,9 @@ class Centerline:
         self.segment_lengths = segment_lengths
         self.cumulative_lengths = cumulative_lengths
         self.total_length = total_length
+        # Compute the tangent vectors
+        self._compute_tangent_vectors()
+        self._compute_binormal_vectors()        
         self.succeeded = True
 
     def _order_skeleton(self) -> None:
@@ -246,7 +252,7 @@ class Centerline:
         # Determine the optimal number of points based on path length
         num_points: int = int(np.clip(int(total_length), min_points, max_points))
         # Fit b-split with appropriate smoothing
-        u = np.concatenate([[0], cumulative_lengths])
+        u = cumulative_lengths
         u /= u[-1]
         tck, _ = splprep(centerline.T, u=u, s=smoothing_factor, k=3)
         # Generate evenly spaced points along the spline
@@ -319,7 +325,45 @@ class Centerline:
         centerline = self.centerline
         diffs = np.diff(centerline, axis=0)
         segment_lengths = np.linalg.norm(diffs, axis=1)
-        cumulative_lengths = np.cumsum(segment_lengths)
+        cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
         total_length = cumulative_lengths[-1]
         return segment_lengths, cumulative_lengths, total_length
-        
+    
+    def _compute_tangent_vectors(self):
+        """
+        Compute the tangent vectors for the centerline, stored in self.tangent_vectors
+        """
+        # Use the cumulative lengths of the centerline as the spline points
+        spline_points = self.cumulative_lengths
+        cs = CubicSpline(spline_points, self.centerline, bc_type='natural')
+        # Compute the tangent vectors
+        tangents = cs(spline_points, 1)
+        # Normalize the tangent vectors
+        tangents /= np.linalg.norm(tangents, axis=1)[:, None]
+        self.tangent_vectors = tangents
+
+    def _compute_binormal_vectors(self) -> None:
+        """
+        Compute the orthogonal vectors from the tangents, stored in self.binormal_vectors
+        """
+        def _compute_binormals(vector: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            if vector[0] == 0 and vector[1] == 0:
+                if vector[2] == 0:
+                    # vec is a zero vector
+                    return None, None
+                # vec is along the z-axis
+                return np.array([1, 0, 0]), np.array([0, 1, 0])
+            else:
+                v1 = np.array([-vector[1], vector[0], 0])
+                v1 = v1 / np.linalg.norm(v1)
+                v2 = np.cross(vector, v1)
+                return v1, v2
+        v1s = []
+        v2s = []
+        for tangent in self.tangent_vectors:
+            v1, v2 = _compute_binormals(tangent)
+            v1s.append(v1)
+            v2s.append(v2)
+        v1s = np.vstack(v1s)
+        v2s = np.vstack(v2s)
+        self.binormal_vectors = v1s, v2s
