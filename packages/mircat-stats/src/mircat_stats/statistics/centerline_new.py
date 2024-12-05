@@ -4,6 +4,7 @@ from loguru import logger
 from kimimaro import skeletonize
 from scipy.interpolate import splprep, splev
 from scipy.ndimage import gaussian_filter1d
+from scipy.signal import savgol_filter
 
 
 class Centerline:
@@ -81,6 +82,8 @@ class Centerline:
                 B-spline smoothing factor (0-1). Default = 0.5
             gaussian_sigma: float
                 The sigma value for the gaussian smoothing. Default = 1.0
+            window_length: int
+                The window length for the Savitzky-Golay filter in physical units (i.e. mm if image is in mm). Default = 10
         """
         self._fit(segmentation)
         if self.skeleton is None:
@@ -170,12 +173,15 @@ class Centerline:
         max_points = kwargs.get("max_points", 150)
         smoothing_factor = kwargs.get("smoothing_factor", 0.5)
         gaussian_sigma = kwargs.get("gaussian_sigma", 1.0)
+        window_length = kwargs.get("window_length", 10)
         # Order the skeleton
         self._order_skeleton()
         # Resample the centerline with a B-spline
         self._resample_centerline_with_bspline(min_points, max_points, smoothing_factor)
         # Smooth the centerline using a gaussian filter
         self._smooth_centerline(gaussian_sigma)
+        # Apply a Savitzky-Golay filter to the centerline
+        self._savitzky_golay_filter_centerline(window_length)
         # Caclulate the centerline metrics
         segment_lengths, cumulative_lengths, total_length = self._calculate_centerline_metrics()
         self.segment_lengths = segment_lengths
@@ -269,6 +275,34 @@ class Centerline:
         smoothed_centerline[0] = centerline[0]
         smoothed_centerline[-1] = centerline[-1]
         self.centerline = smoothed_centerline
+
+    def _savitzky_golay_filter_centerline(self, window_length: int) -> None:
+        """Use a Savitzky-Golay filter to smooth centerline after gaussian smoothing
+        Parameters:
+        -----------
+        window_length : int
+            The window length for the Savitzky-Golay filter in physical units (i.e. mm if spacing is in mm)
+        """
+        centerline = self.centerline
+        polyorder = 2
+        _, cumulative_lengths, _ = self._calculate_centerline_metrics()
+        # Find window size based on cumulative length threshold
+        window_size = None
+        for i, length in enumerate(cumulative_lengths):
+            if length > window_length:
+                window_size = i + 1
+                break
+        if window_size is None:
+            window_size = 3
+        if window_size % 2 == 0:
+            window_size += 1
+        # Only smooth if we have enough points
+        if len(centerline) > window_size:
+            smoothed = np.zeros_like(centerline)
+            for dim in range(3):
+                smoothed[:, dim] = savgol_filter(centerline[:, dim], window_size, polyorder)
+            self.centerline = smoothed
+
 
     def _calculate_centerline_metrics(self) -> tuple[np.ndarray, np.ndarray, float]:
         """

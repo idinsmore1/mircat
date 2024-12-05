@@ -67,7 +67,8 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
             start, end = _find_aortic_region_endpoints(region, vert_midlines)
             # Convert the segmentation and image to numpy arrays with the arch at the top
             aorta_seg_arr = _make_aorta_superior_array(aorta_seg[:, :, start:end])
-            aorta_img_arr = _make_aorta_superior_array(aorta_img[:, :, start:end])
+            # We clip the image houndsfield units to be between -200 and 250 for fat analysis
+            aorta_img_arr = np.clip(_make_aorta_superior_array(aorta_img[:, :, start:end]), -200, 250)
             
         except Exception as e:
             logger.opt(exception=True).error(f"Error measuring {region} aorta in {nifti.path}")
