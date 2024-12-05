@@ -50,6 +50,48 @@ class Centerline:
     }
     skeleletonize_kwargs = teasar_kwargs.union(non_teasar_kwargs)
 
+    def __init__(self, spacing: tuple[float, float, float], label: int=1, **kwargs) -> np.ndarray | None:
+        """Initialize a Centerline object
+        Parameters:
+        -----------
+        spacing : tuple[float, float, float]
+            The spacing of the image
+        label : int
+            The label to use for the centerline
+        kwargs : dict
+            The keyword arguments to pass to the skeletonize function
+        """
+        self.spacing = spacing
+        self.label = label
+        self.skeleton: tuple[np.ndarray, np.ndarray] | None = None
+        self._set_centerline_kwargs(kwargs)
+    
+    def create_centerline(self, segmentation: np.ndarray, **kwargs) -> None:
+        """Create a centerline on the segmentation and set it as self.centerline
+        Parameters:
+        -----------
+        segmentation : np.ndarray
+            The segmentation to create the centerline on
+        **kwargs:
+            min_points: int
+                The minimum number of points to keep in the centerline. Default = 25
+            max_points: int
+                The maximum number of points to keep in the centerline. Default = 200
+            smoothing_factor: float
+                B-spline smoothing factor (0-1). Default = 0.5
+            gaussian_sigma: float
+                The sigma value for the gaussian smoothing. Default = 1.0
+        """
+        self._fit(segmentation)
+        if self.skeleton is None:
+            self.succeeded = False
+            return
+        try:
+            self._postprocess_skeleton(**kwargs)
+        except Exception as e:
+            logger.opt(exception=True).error(f"Error postprocessing centerline: {e}")
+            self.succeeded = False
+    
     @staticmethod
     def _validate_centerline_kwargs(kwargs) -> tuple[dict, dict]:
         """Validate the keyword arguments passed to the initialization of the Centerline object and
@@ -87,51 +129,7 @@ class Centerline:
         self.teasar_kwargs.update(teasar_kwargs)
         self.non_teasar_kwargs = Centerline.base_non_teasar_kwargs.copy()
         self.non_teasar_kwargs.update(non_teasar_kwargs)
-
-    def __init__(self, spacing: tuple[float, float, float], label: int=1, **kwargs) -> np.ndarray | None:
-        """Initialize a Centerline object
-        Parameters:
-        -----------
-        spacing : tuple[float, float, float]
-            The spacing of the image
-        label : int
-            The label to use for the centerline
-        kwargs : dict
-            The keyword arguments to pass to the skeletonize function
-        """
-        self.spacing = spacing
-        self.label = label
-        self.skeleton: tuple[np.ndarray, np.ndarray] | None = None
-        self._set_centerline_kwargs(kwargs)
-
-
-    def create_centerline(self, segmentation: np.ndarray, **kwargs) -> None:
-        """Create a centerline on the segmentation and set it as self.centerline
-        Parameters:
-        -----------
-        segmentation : np.ndarray
-            The segmentation to create the centerline on
-        **kwargs:
-            min_points: int
-                The minimum number of points to keep in the centerline. Default = 25
-            max_points: int
-                The maximum number of points to keep in the centerline. Default = 200
-            smoothing_factor: float
-                B-spline smoothing factor (0-1). Default = 0.5
-            gaussian_sigma: float
-                The sigma value for the gaussian smoothing. Default = 1.0
-        """
-        self._fit(segmentation)
-        if self.skeleton is None:
-            self.succeeded = False
-            return
-        try:
-            self._postprocess_skeleton(**kwargs)
-        except Exception as e:
-            logger.error(f"Error postprocessing centerline: {e}")
-            self.succeeded = False
         
-
     def _fit(self, segmentation: np.ndarray) -> None:
         """Fit a centerline on the segmentation
         Parameters:
@@ -154,7 +152,6 @@ class Centerline:
         except KeyError:
             logger.warning(f"No centerline found for label {self.label}")
             
-
     def _postprocess_skeleton(self, **kwargs) -> None:
         """Postprocess the skeleton with ordering and smoothing
         Parameters:
@@ -170,7 +167,7 @@ class Centerline:
                 The sigma value for the gaussian smoothing. Default = 1.0
         """
         min_points = kwargs.get("min_points", 25)
-        max_points = kwargs.get("max_points", 200)
+        max_points = kwargs.get("max_points", 150)
         smoothing_factor = kwargs.get("smoothing_factor", 0.5)
         gaussian_sigma = kwargs.get("gaussian_sigma", 1.0)
         # Order the skeleton
@@ -222,6 +219,7 @@ class Centerline:
         ordered_vertices = [vertices[idx] for idx in ordered_vertices_indices]
         # set the centerline
         self.centerline = np.asarray(ordered_vertices)
+        self.raw_centerline = np.asarray(ordered_vertices)
 
     def _resample_centerline_with_bspline(self, min_points: int, max_points: int, smoothing_factor: float) -> None:
         """Resample the centerline with a B-spline
@@ -247,6 +245,31 @@ class Centerline:
         new_centerline = np.column_stack(splev(u_new, tck))
         self.centerline = new_centerline
 
+    def _smooth_centerline(self, sigma: float) -> None:
+        """Smooth the centerline with a gaussian filter
+        Parameters:
+        -----------
+        sigma : float
+            The sigma value for the gaussian filter
+        """
+        centerline = self.centerline
+        # Reflect points at boundaries to avoid edge effects
+        n_reflect = int(4*sigma)
+        start_reflect = centerline[n_reflect:0:-1]
+        end_reflect = centerline[-2:-n_reflect-2:-1]
+        # Add padding so that ends are preserved
+        extended_centerline = np.vstack([start_reflect, centerline, end_reflect])
+        smoothed_centerline = np.zeros_like(extended_centerline)
+        # Smooth in each dimension
+        for dim in range(3):
+            smoothed_centerline[:, dim] = gaussian_filter1d(extended_centerline[:, dim], sigma)
+        # Remove padding
+        smoothed_centerline = smoothed_centerline[n_reflect:-n_reflect]
+        # Preserve the endpoints
+        smoothed_centerline[0] = centerline[0]
+        smoothed_centerline[-1] = centerline[-1]
+        self.centerline = smoothed_centerline
+
     def _calculate_centerline_metrics(self) -> tuple[np.ndarray, np.ndarray, float]:
         """
         Calculate the centerline segment lengths, cumulative lengths, and total length in spatial units.
@@ -262,33 +285,4 @@ class Centerline:
         cumulative_lengths = np.cumsum(segment_lengths)
         total_length = cumulative_lengths[-1]
         return segment_lengths, cumulative_lengths, total_length
-
-    def _smooth_centerline(self, sigma: float) -> None:
-        """Smooth the centerline with a gaussian filter
-        Parameters:
-        -----------
-        sigma : float
-            The sigma value for the gaussian filter
-        """
-        centerline = self.centerline
-        # Reflect points at boundaries to avoid edge effects
-        n_reflect = int(4*sigma)
-        start_reflect = centerline[n_reflect:0:-1]
-        end_reflect = centerline[-2:-n_reflect-2:-1]
-        # Add padding so that ends are preserved
-        extended_centerline = np.vstack([start_reflect, centerline, end_reflect])
-        smoothed_centerline = np.zeros_like(centerline)
-        # Smooth in each dimension
-        for dim in range(3):
-            smoothed_centerline[:, dim] = gaussian_filter1d(extended_centerline[:, dim], sigma)
-        # Remove padding
-        smoothed_centerline = smoothed_centerline[n_reflect:-n_reflect]
-        # Preserve the endpoints
-        smoothed_centerline[0] = centerline[0]
-        smoothed_centerline[-1] = centerline[-1]
-        self.centerline = smoothed_centerline
-
-
-
-
         

@@ -3,6 +3,7 @@ import SimpleITK as sitk
 
 from loguru import logger
 from mircat_stats.configs.logging import timer
+from mircat_stats.statistics.centerline_new import Centerline
 from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.statistics.segmentation import Segmentation, SegNotFoundError
 
@@ -40,6 +41,7 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     if not any(region_existence.values()):
         logger.warning(f"No aortic regions found in {nifti.path}")
         return aorta_stats
+    
     # Filter to the segmentations we need
     try:
         aorta = Segmentation(nifti, ['aorta', 'brachiocephalic_trunk', 'subclavian_artery_left'])
@@ -51,6 +53,8 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     except Exception as e:
         logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}")
         return aorta_stats
+    
+    # Go through each region and measure it
     for region, has_region in region_existence.items():
         # If the region is not in the segmentation, skip it
         if not has_region:
@@ -64,6 +68,7 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
             # Convert the segmentation and image to numpy arrays with the arch at the top
             aorta_seg_arr = _make_aorta_superior_array(aorta_seg[:, :, start:end])
             aorta_img_arr = _make_aorta_superior_array(aorta_img[:, :, start:end])
+            
         except Exception as e:
             logger.opt(exception=True).error(f"Error measuring {region} aorta in {nifti.path}")
             continue
@@ -148,4 +153,5 @@ def measure_aortic_region(seg_arr: np.ndarray, img_arr: np.ndarray, region: str)
     dict[str, float]
         The measurements for the aorta region
     """
-    pass
+    centerline = Centerline(AORTA_ANISOTROPIC_SPACING_MM, AORTA_LABEL)
+    centerline.create_centerline(seg_arr)
