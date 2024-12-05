@@ -5,7 +5,7 @@ from kimimaro import skeletonize
 from scipy.interpolate import splprep, splev
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import savgol_filter
-
+from mircat_stats.statistics.cpr import _compute_tangent_vectors
 
 class Centerline:
     # These are specifically for the teasar_params dictionary argument
@@ -66,6 +66,9 @@ class Centerline:
         self.label = label
         self.skeleton: tuple[np.ndarray, np.ndarray] | None = None
         self._set_centerline_kwargs(kwargs)
+
+    def __len__(self) -> int:
+        return len(self.centerline)
     
     def create_centerline(self, segmentation: np.ndarray, **kwargs) -> None:
         """Create a centerline on the segmentation and set it as self.centerline
