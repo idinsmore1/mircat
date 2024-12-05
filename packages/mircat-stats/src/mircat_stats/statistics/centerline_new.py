@@ -7,6 +7,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import savgol_filter
 from mircat_stats.statistics.cpr import _compute_tangent_vectors
 
+
 class Centerline:
     # These are specifically for the teasar_params dictionary argument
     teasar_kwargs = {
@@ -20,7 +21,7 @@ class Centerline:
         "soma_invalidation_scale",
         "max_paths",
     }
-    base_teasar_kwargs = {'scale': 1.0, 'const': 50}
+    base_teasar_kwargs = {"scale": 1.0, "const": 50}
     # These are the rest of the arguments
     non_teasar_kwargs = {
         "dust_threshold",
@@ -47,11 +48,11 @@ class Centerline:
         "extra_targets_after": [],
         "fill_holes": False,
         "fix_avocados": False,
-        "voxel_graph": None
+        "voxel_graph": None,
     }
     skeleletonize_kwargs = teasar_kwargs.union(non_teasar_kwargs)
 
-    def __init__(self, spacing: tuple[float, float, float], label: int=1, **kwargs) -> np.ndarray | None:
+    def __init__(self, spacing: tuple[float, float, float], label: int = 1, **kwargs) -> np.ndarray | None:
         """Initialize a Centerline object
         Parameters:
         -----------
@@ -69,10 +70,10 @@ class Centerline:
 
     def __len__(self) -> int:
         return len(self.centerline)
-    
+
     def __eq__(self, value: object) -> bool:
         return np.array_equal(self.centerline, value)
-    
+
     def create_centerline(self, segmentation: np.ndarray, **kwargs) -> None:
         """Create a centerline on the segmentation and set it as self.centerline
         Parameters:
@@ -100,7 +101,7 @@ class Centerline:
         except Exception as e:
             logger.opt(exception=True).error(f"Error postprocessing centerline: {e}")
             self.succeeded = False
-    
+
     @staticmethod
     def _validate_centerline_kwargs(kwargs) -> tuple[dict, dict]:
         """Validate the keyword arguments passed to the initialization of the Centerline object and
@@ -120,7 +121,7 @@ class Centerline:
         teasar_kwargs = {k: v for k, v in kwargs.items() if k in Centerline.teasar_kwargs}
         non_teasar_kwargs = {k: v for k, v in kwargs.items() if k in Centerline.non_teasar_kwargs}
         return teasar_kwargs, non_teasar_kwargs
-    
+
     def _set_centerline_kwargs(self, kwargs: dict) -> None:
         """Set the teasar and non-teasar keyword arguments for the skeletonize function
         Parameters:
@@ -138,7 +139,7 @@ class Centerline:
         self.teasar_kwargs.update(teasar_kwargs)
         self.non_teasar_kwargs = Centerline.base_non_teasar_kwargs.copy()
         self.non_teasar_kwargs.update(non_teasar_kwargs)
-        
+
     def _fit(self, segmentation: np.ndarray) -> None:
         """Fit a centerline on the segmentation
         Parameters:
@@ -151,7 +152,7 @@ class Centerline:
             teasar_params=self.teasar_kwargs,
             anisotropy=self.spacing,
             object_ids=[self.label],
-            **self.non_teasar_kwargs
+            **self.non_teasar_kwargs,
         )
         try:
             skel = skeleton[self.label]
@@ -160,7 +161,7 @@ class Centerline:
             self.skeleton = vertices, edges
         except KeyError:
             logger.warning(f"No centerline found for label {self.label}")
-            
+
     def _postprocess_skeleton(self, **kwargs) -> None:
         """Postprocess the skeleton with ordering and smoothing
         Parameters:
@@ -195,7 +196,7 @@ class Centerline:
         self.total_length = total_length
         # Compute the tangent vectors
         self._compute_tangent_vectors()
-        self._compute_binormal_vectors()        
+        self._compute_binormal_vectors()
         self.succeeded = True
 
     def _order_skeleton(self) -> None:
@@ -269,9 +270,9 @@ class Centerline:
         """
         centerline = self.centerline
         # Reflect points at boundaries to avoid edge effects
-        n_reflect = int(4*sigma)
+        n_reflect = int(4 * sigma)
         start_reflect = centerline[n_reflect:0:-1]
-        end_reflect = centerline[-2:-n_reflect-2:-1]
+        end_reflect = centerline[-2 : -n_reflect - 2 : -1]
         # Add padding so that ends are preserved
         extended_centerline = np.vstack([start_reflect, centerline, end_reflect])
         smoothed_centerline = np.zeros_like(extended_centerline)
@@ -312,7 +313,6 @@ class Centerline:
                 smoothed[:, dim] = savgol_filter(centerline[:, dim], window_size, polyorder)
             self.centerline = smoothed
 
-
     def _calculate_centerline_metrics(self) -> tuple[np.ndarray, np.ndarray, float]:
         """
         Calculate the centerline segment lengths, cumulative lengths, and total length in spatial units.
@@ -328,14 +328,14 @@ class Centerline:
         cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
         total_length = cumulative_lengths[-1]
         return segment_lengths, cumulative_lengths, total_length
-    
+
     def _compute_tangent_vectors(self):
         """
         Compute the tangent vectors for the centerline, stored in self.tangent_vectors
         """
         # Use the cumulative lengths of the centerline as the spline points
         spline_points = self.cumulative_lengths
-        cs = CubicSpline(spline_points, self.centerline, bc_type='natural')
+        cs = CubicSpline(spline_points, self.centerline, bc_type="natural")
         # Compute the tangent vectors
         tangents = cs(spline_points, 1)
         # Normalize the tangent vectors
@@ -346,6 +346,7 @@ class Centerline:
         """
         Compute the orthogonal vectors from the tangents, stored in self.binormal_vectors
         """
+
         def _compute_binormals(vector: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
             if vector[0] == 0 and vector[1] == 0:
                 if vector[2] == 0:
@@ -358,6 +359,7 @@ class Centerline:
                 v1 = v1 / np.linalg.norm(v1)
                 v2 = np.cross(vector, v1)
                 return v1, v2
+
         v1s = []
         v2s = []
         for tangent in self.tangent_vectors:

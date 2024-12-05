@@ -148,11 +148,11 @@ def _measure_aorta_region(
         mid_diam = measure_mid_cpr_diameter(cpr, cross_section_spacing)
         diam_data.update(mid_diam)
         prox_diam_data = measure_cross_sectional_diameter(cpr[0], AORTA_CROSS_SECTION_SPACING, diff_threshold=5)
-        prox_diam = prox_diam_data['max_diam']
+        prox_diam = prox_diam_data["max_diam"]
         dist_diam_data = measure_cross_sectional_diameter(cpr[-1], AORTA_CROSS_SECTION_SPACING, diff_threshold=5)
-        dist_diam = dist_diam_data['max_diam']
-        diam_data['dist_diam'] = dist_diam
-        diam_data['prox_diam'] = prox_diam
+        dist_diam = dist_diam_data["max_diam"]
+        diam_data["dist_diam"] = dist_diam
+        diam_data["prox_diam"] = prox_diam
         diam_data = {f"{region}_{k}": v for k, v in diam_data.items()}
         region_stats.update(diam_data)
     return region_stats
@@ -246,7 +246,7 @@ def _measure_thoracic_diameters(
             region_diams.update(measure_mid_cpr_diameter(cpr, AORTA_CROSS_SECTION_SPACING))
             diams = {f"{prefix}_{k}": v for k, v in region_diams.items()}
             prox_diam_data = measure_cross_sectional_diameter(cpr[0], AORTA_CROSS_SECTION_SPACING, diff_threshold=5)
-            diams[f"{prefix}_prox_diam"] = prox_diam_data['max_diam']
+            diams[f"{prefix}_prox_diam"] = prox_diam_data["max_diam"]
             diam_data.update(diams)
     return diam_data
 

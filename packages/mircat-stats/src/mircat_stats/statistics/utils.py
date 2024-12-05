@@ -1,5 +1,6 @@
 import SimpleITK as sitk
 import numpy as np
+from skimage import measure
 
 
 def _calc_shape_stats(seg: sitk.Image) -> sitk.LabelShapeStatisticsImageFilter:
@@ -229,3 +230,13 @@ def _filter_largest_components(image, labels_of_interest):
         output_image = sitk.Add(output_image, sitk.Multiply(largest_component, label))
 
     return output_image
+
+
+def _get_regions(image: np.ndarray) -> list:
+    """Get the regions of an image using skimage.measure.regionprops
+    :param image: the input image
+    :return: the regions of an image
+    """
+    labels = measure.label(image)
+    regions = measure.regionprops(labels)
+    return regions

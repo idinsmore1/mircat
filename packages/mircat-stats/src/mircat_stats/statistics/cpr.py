@@ -102,9 +102,7 @@ def _extract_cross_sectional_slice(arr, point, tangent_vector, slice_size, resol
     if is_binary:
         slice_points = np.rint(slice_points).astype(int)
         # Initialize an empty slice with zeros (padding)
-        slice_2d = np.zeros(
-            (int(height / resolution), int(width / resolution)), dtype=arr.dtype
-        )
+        slice_2d = np.zeros((int(height / resolution), int(width / resolution)), dtype=arr.dtype)
         if arr.min() != 0:
             slice_2d = slice_2d + arr.min()
         # Compute valid index ranges considering the boundaries
@@ -114,9 +112,7 @@ def _extract_cross_sectional_slice(arr, point, tangent_vector, slice_size, resol
         valid_indices = valid_x & valid_y & valid_z
         # Extract values for valid indices and assign to the slice, leave zeros elsewhere
         valid_points = slice_points[valid_indices]
-        slice_2d[valid_indices] = arr[
-            valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]
-        ]
+        slice_2d[valid_indices] = arr[valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]]
     else:
         # Perform linear interpolation in each axis and fill with min value
         method = "linear"
@@ -151,24 +147,7 @@ def _postprocess_cross_section(cross_section: np.ndarray, sigma: int) -> tuple[n
         center_label = remove_small_holes(center_label)
         center_label = gaussian(center_label, sigma=sigma).round(0)
         # Assign the output of the binary to the appropriate label
-        output_cross_section[center_label == 1] = label  
-    # # Check if the center label touches the image border
-    # height, width = output_cross_section.shape
-    # main_label = (output_cross_section == 1).astype(int)
-    # if np.any(main_label):
-    #     borders = {"top": 0, "bottom": height - 1, "left": 0, "right": width - 1}
-    #     touches_border = {
-    #         "top": np.any(main_label[borders["top"], :]),
-    #         "bottom": np.any(main_label[borders["bottom"], :]),
-    #         "left": np.any(main_label[:, borders["left"]]),
-    #         "right": np.any(main_label[:, borders["right"]]),
-    #     }
-    #     touching_any = any(touches_border.values())
-    #     if touching_any:
-    #         return np.zeros_like(cross_section), 1
-    #     main_region = _get_regions(main_label)
-    #     solidity = main_region[0].solidity
-    #     print(solidity)
+        output_cross_section[center_label == 1] = label
     return output_cross_section
 
 
@@ -224,16 +203,14 @@ def measure_largest_cpr_diameter(cpr: np.ndarray, pixel_spacing: tuple, diff_thr
     circularity_threshold = 0.9
     eccentricity_threshold = 0.8
     for cross_section in cpr:
-        data = measure_cross_sectional_diameter(
-            cross_section, pixel_spacing, diff_threshold
-        )
+        data = measure_cross_sectional_diameter(cross_section, pixel_spacing, diff_threshold)
         # is_convex = data['solidity'] >= solidity_threshold
         # is_circular = data['circularity'] >= circularity_threshold and data['circularity'] <= 1.1
         # is_not_elliptical = data['eccentricity'] <= eccentricity_threshold
         # if is_convex and is_circular and is_not_elliptical:
-        avg_diam = data['max_diam']
-        major_diam = data['major_diam']
-        minor_diam = data['minor_diam']
+        avg_diam = data["max_diam"]
+        major_diam = data["major_diam"]
+        minor_diam = data["minor_diam"]
         avg_diams.append(avg_diam)
         major_diams.append(major_diam)
         minor_diams.append(minor_diam)
@@ -275,14 +252,7 @@ def measure_cross_sectional_diameter(
     :return: a dictionary containing the max, major, minor diameters, as well as the solidarity, cicularity, and eccentricity
     """
     regions = _get_regions(cross_section)
-    data = {
-        'max_diam': 0,
-        'major_diam': 0,
-        'minor_diam': 0,
-        'solidity': 0,
-        'circularity': 0,
-        'eccentricity': 1.0
-    }
+    data = {"max_diam": 0, "major_diam": 0, "minor_diam": 0, "solidity": 0, "circularity": 0, "eccentricity": 1.0}
     if len(regions) == 0:
         return data
     region = regions[0]
@@ -295,17 +265,19 @@ def measure_cross_sectional_diameter(
         max_diam = round((major_diam + minor_diam) / 2, 1)
     else:
         max_diam = min(major_diam, minor_diam)
-    solidity = region.solidity 
-    circularity = (4 * np.pi * region.area) / (region.perimeter ** 2) if region.perimeter > 0 else 0
+    solidity = region.solidity
+    circularity = (4 * np.pi * region.area) / (region.perimeter**2) if region.perimeter > 0 else 0
     eccentricity = region.eccentricity
-    data.update({
-        'max_diam': max_diam,
-        'major_diam': major_diam,
-        'minor_diam': minor_diam,
-        'solidity': round(solidity, 2),
-        'circularity': round(circularity, 2),
-        'eccentricity': round(eccentricity, 2)
-    })
+    data.update(
+        {
+            "max_diam": max_diam,
+            "major_diam": major_diam,
+            "minor_diam": minor_diam,
+            "solidity": round(solidity, 2),
+            "circularity": round(circularity, 2),
+            "eccentricity": round(eccentricity, 2),
+        }
+    )
     return data
 
 

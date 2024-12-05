@@ -41,10 +41,10 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     if not any(region_existence.values()):
         logger.warning(f"No aortic regions found in {nifti.path}")
         return aorta_stats
-    
+
     # Filter to the segmentations we need
     try:
-        aorta = Segmentation(nifti, ['aorta', 'brachiocephalic_trunk', 'subclavian_artery_left'])
+        aorta = Segmentation(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
         aorta_seg: sitk.Image = aorta.segmentation
         aorta_img: sitk.Image = aorta.original_ct
     except SegNotFoundError as e:
@@ -53,14 +53,14 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     except Exception as e:
         logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}")
         return aorta_stats
-    
+
     # Go through each region and measure it
     for region, has_region in region_existence.items():
         # If the region is not in the segmentation, skip it
         if not has_region:
             continue
         # If the region is descending and full thoracic is present, skip it
-        if region == 'descending' and region_existence['thoracic']:
+        if region == "descending" and region_existence["thoracic"]:
             continue
         # Find the start and end of the region
         try:
@@ -111,9 +111,9 @@ def _find_aortic_region_endpoints(region: str, vert_midlines: dict) -> tuple[int
     """
     possible_locs = AORTA_REGIONS_VERT_MAP[region]
     midlines = [
-        vert_midlines.get(f'vertebrae_{vert}_midline')
+        vert_midlines.get(f"vertebrae_{vert}_midline")
         for vert in possible_locs
-        if vert_midlines.get(f'vertebrae_{vert}_midline') is not None
+        if vert_midlines.get(f"vertebrae_{vert}_midline") is not None
     ]
     midlines = [midline for midline in midlines if midline]
     start = min(midlines)
@@ -162,7 +162,3 @@ def measure_aortic_region(seg_arr: np.ndarray, img_arr: np.ndarray, region: str)
     if not centerline.succeeded:
         logger.warning(f"Failed to create centerline for {region} aorta")
         return region_stats
-    
-    
-
-

@@ -103,7 +103,7 @@ torch_model_configs = {
             "iliac_artery_right": 16,
             "iliac_vena_left": 17,
             "iliac_vena_right": 18,
-        }
+        },
     },
     "body": {
         "name": "body",
