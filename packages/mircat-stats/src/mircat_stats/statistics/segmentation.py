@@ -179,7 +179,7 @@ class Aorta(Segmentation):
         self._make_aorta_superior_numpy_array()
         self._get_region_endpoints()
 
-
+    #### INITIALIZATION OPERATIONS 
     def _check_aortic_regions_in_segmentation(self) -> dict[str, bool]:
         """Check if the aortic regions are present in the segmentation.
         Returns:
@@ -214,6 +214,8 @@ class Aorta(Segmentation):
         """Convert the aorta segmentation to a numpy array with the arch at the top and adjust vertebral midlines"""
         self.segmentation_arr = np.flipud(sitk.GetArrayFromImage(self.segmentation))
         self.original_ct_arr = np.flipud(sitk.GetArrayFromImage(self.original_ct))
+        # Clip the houndsfield units for fat analysis
+        self.original_ct_arr = np.clip(self.original_ct_arr, -200, 250)
         # Adjust the vertebral midlines to account for the flip
         new_midlines = {k: (self.segmentation_arr.shape[0] - 1) - v for k, v in self.vert_midlines.items()}
         self.vert_midlines = new_midlines

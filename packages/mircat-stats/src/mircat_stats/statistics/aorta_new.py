@@ -45,30 +45,6 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     except Exception as e:
         logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}")
         return aorta_stats
-    
-    if not aorta.region_existence:
-        return aorta_stats
-
-    # Go through each region and measure it
-    for region, has_region in region_existence.items():
-        # If the region is not in the segmentation, skip it
-        if not has_region:
-            continue
-        # If the region is descending and full thoracic is present, skip it
-        if region == "descending" and region_existence["thoracic"]:
-            continue
-        # Find the start and end of the region
-        try:
-            start, end = _find_aortic_region_endpoints(region, vert_midlines)
-            # Convert the segmentation and image to numpy arrays with the arch at the top
-            aorta_seg_arr = _make_aorta_superior_array(aorta_seg[:, :, start:end])
-            aorta_img_arr = _make_aorta_superior_array(aorta_img[:, :, start:end])
-            # We clip the image houndsfield units to be between -200 and 250 for fat analysis
-            aorta_img_arr.clip(-200, 250, out=aorta_img_arr)
-
-        except Exception as e:
-            logger.opt(exception=True).error(f"Error measuring {region} aorta in {nifti.path}")
-            continue
 
 
 def _check_aortic_regions_in_segmentation(vert_midlines: dict) -> dict[str, bool]:
