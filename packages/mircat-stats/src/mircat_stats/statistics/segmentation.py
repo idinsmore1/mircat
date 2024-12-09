@@ -5,13 +5,20 @@ from loguru import logger
 from mircat_stats.statistics.nifti import MircatNifti, _resample
 from mircat_stats.statistics.centerline_new import Centerline
 from mircat_stats.statistics.cpr_new import StraightenedCPR
-from mircat_stats.statistics.utils import _filter_largest_components
+from mircat_stats.statistics.utils import _filter_largest_components, _get_regions
 from mircat_stats.configs.models import torch_model_configs
 
 
 class SegNotFoundError(ValueError):
     """
     Raised when the aorta segmentation is not found
+    """
+
+    pass
+
+class ArchNotFoundError(ValueError):
+    """
+    Raised when the aortic arch can not be defined
     """
 
     pass
@@ -191,18 +198,18 @@ class Aorta(Segmentation):
             Dictionary with keys as region names and values as boolean indicating if the region is present
         """
         vert_midlines = self.vert_midlines
-            # T4 and at least T8 need to be in the image for thoracic to be measured
-        thoracic = bool(vert_midlines.get("vertebrae_T8_midline", False) and vert_midlines.get("vertebrae_T4_midline", False))
         # L3 has to be in the image for abdominal to be measured
         abdominal = bool(vert_midlines.get("vertebrae_L3_midline", False))
+        # T4 and at least T8 need to be in the image for thoracic to be measured
+        thoracic = bool(vert_midlines.get("vertebrae_T8_midline", False) and vert_midlines.get("vertebrae_T4_midline", False))
         # If at least the T12 and T9 are in the image, then we can measure the descending separate from the ascending
         descending = bool(vert_midlines.get("vertebrae_T12_midline", False) and vert_midlines.get("vertebrae_T9_midline", False))
         region_existence = {
-            "thoracic": {
-                'exists': thoracic, 
-            },
             "abdominal": {
                 'exists': abdominal, 
+            },
+            "thoracic": {
+                'exists': thoracic, 
             },
             "descending": {
                 'exists': descending, 
@@ -252,10 +259,19 @@ class Aorta(Segmentation):
         """
         aorta_stats = {}
         # Create the aorta centerline
-        self._create_centerline()
-        self._create_cpr()
-        self._split_regions()
+        self.setup_stats()
         return aorta_stats
+
+    def setup_stats(self):
+        'Set up the aorta centerline and cprs for statistics'
+        (
+            self
+            ._create_centerline()
+            ._create_cpr()
+            ._split_main_regions()
+        )
+        if self.region_existence['thoracic']['exists']:
+            self._split_thoracic_regions()
 
     def _create_centerline(self):
         'Create the centerline for the aorta'
@@ -273,7 +289,8 @@ class Aorta(Segmentation):
         elif descending:
             max_points += 200
         self.centerline.create_centerline(self.segmentation_arr, max_points=max_points, window_length=window_length)
-    
+        return self
+
     def _create_cpr(self):
         'Create the CPR for the aorta'
         self.seg_cpr = StraightenedCPR(
@@ -292,28 +309,90 @@ class Aorta(Segmentation):
         #     sigma=2,
         #     is_binary=False
         # ).straighten()
+        return self
 
-    def _split_regions(self):
-        'Split the centerline and CPR into aortic regions'
+    def _split_main_regions(self):
+        'Split the centerline and CPR into main aortic regions of abdominal, thoracic and descending'
         regions = {}
-        abdominal = self.region_existence["abdominal"]
-        thoracic = self.region_existence["thoracic"]
-        descending = self.region_existence["descending"]
         # Split the centerline and cprs into the appropriate_regions
-        if abdominal['exists']:
-            start, end = abdominal['endpoints']
-            self.region_existence['abdominal']['indices'] = self._split_region(start, end)
-        if thoracic['exists']:
-            start, end = thoracic['endpoints']
-            self.region_existence['thoracic']['indices'] = self._split_region(start, end)
-        elif descending['exists']:
-            start, end = descending['endpoints']
-            self.region_existence['descending']['indices'] = self._split_region(start, end)
+        for region in self.region_existence:
+            if self.region_existence[region]['exists']:
+                if region == 'descending' and self.region_existence['thoracic']['exists']:
+                    continue
+                start, end = self.region_existence[region]['endpoints']
+                self.region_existence[region]['indices'] = self._split_region(start, end)
+        return self
 
     def _split_region(self, start: int, end: int):
         'Split the centerline and CPR into a specific region'
-        valid_indicies = []
+        valid_indices = []
         for i, point in enumerate(self.centerline.centerline):
             if point[0] >= start and point[0] <= end:
-                valid_indicies.append(i)
-        return valid_indicies
+                valid_indices.append(i)
+        return valid_indices
+    
+    def _split_thoracic_regions(self):
+        "Split the thoracic aorta centerline and CPRs into ascending, arch, and descending"
+        thoracic_regions = {}
+        thoracic_indices = self.region_existence['thoracic']['indices']
+        thoracic_cpr = self.seg_cpr.cpr_arr[thoracic_indices]
+        thoracic_centerline = self.centerline.centerline[thoracic_indices]
+        thoracic_cumulative_lengths = self.centerline.cumulative_lengths[thoracic_indices]
+        # check if brachiocephalic trunk and left subclavian artery segmentations are present
+        arch_segs_in_cpr = np.all(np.isin([2, 3], np.unique(thoracic_cpr)))
+        # Split the arch from the ascending and descending
+        if arch_segs_in_cpr:
+            logger.debug("Using segmentations to define the aortic arch")
+            # use the segmentations to define the physical region of the arch
+            brach_label = 2
+            left_subclavian_label = 3
+            # Have to do it this way because we need the start and end based on the
+            # thoracic indices, so we can slice with the index
+            for slice_idx, cross_section in enumerate(thoracic_cpr):
+                if brach_label in cross_section:
+                    arch_start = slice_idx
+                    break
+            for slice_idx, cross_section in enumerate(thoracic_cpr[::-1]):
+                if left_subclavian_label in cross_section:
+                    arch_end = len(thoracic_cpr) - slice_idx
+                    break
+        else:
+            logger.debug("Using centerline to define the aortic arch")
+            # use the top-down view of the aorta to find the arch - less good
+            min_pixel_area = 50
+            # This is the peak of the centerline
+            split = int(self.centerline.centerline[:, 0].min())
+            for slice_idx, axial_image in enumerate(self.segmentation_arr):
+                regions = _get_regions(axial_image)
+                if len(regions) == 2 and slice_idx > split:
+                    reg0 = regions[0]
+                    reg1 = regions[1]
+                    # If both sections of the aorta are sufficiently large,
+                    if reg0.area > min_pixel_area and reg1.area > min_pixel_area:
+                        split = slice_idx
+                        break
+            if split is None:
+                logger.error("Could not define the aortic arch")
+                raise ArchNotFoundError("Could not define the aortic arch")
+            for i, point in enumerate(thoracic_centerline):
+                if point[0] <= split:
+                    arch_start = i
+                    break
+            for i, point in enumerate(thoracic_centerline[::-1]):
+                if point[0] <= split:
+                    arch_end = len(thoracic_centerline) - i
+                    break
+        # Remove the aortic root from the ascending aorta by looking at cumulative length
+        asc_start = 0
+        for i, length in enumerate(thoracic_cumulative_lengths):
+            if length > self.root_length_mm:
+                asc_start = i
+                break
+        thoracic_regions['ascending'] = thoracic_indices[:arch_start]
+        thoracic_regions['ascending_rootless'] = thoracic_indices[asc_start:arch_start]
+        thoracic_regions['arch'] = thoracic_indices[arch_start:arch_end]
+        thoracic_regions['descending'] = thoracic_indices[arch_end:]
+        self.thoracic_regions = thoracic_regions
+        return self
+        
+            
