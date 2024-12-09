@@ -3,6 +3,8 @@ import numpy as np
 from loguru import logger
 
 from mircat_stats.statistics.nifti import MircatNifti, _resample
+from mircat_stats.statistics.centerline_new import Centerline
+from mircat_stats.statistics.cpr_new import StraightenedCPR
 from mircat_stats.statistics.utils import _filter_largest_components
 from mircat_stats.configs.models import torch_model_configs
 
@@ -49,7 +51,7 @@ class Segmentation:
         """
         self.path = nifti.path
         self.original_ct = nifti.original_ct
-        self.vert_midlines = nifti.vert_midlines
+        self.vert_midlines = nifti.vert_midlines.copy()
         self.seg_folder = nifti.seg_folder
         self.seg_names = seg_names
         self._find_seg_model()
@@ -168,10 +170,11 @@ class Aorta(Segmentation):
         "descending": [f"T{i}" for i in range(5, 13)],
     }
     # These are the default values for the aorta
-    cross_section_spacing_mm: tuple = (1, 1)
-    root_length_mm: int = 10
     anisotropic_spacing_mm: tuple = (1, 1, 1)
+    cross_section_spacing_mm: tuple = (1, 1)
     cross_section_size_mm: tuple = (100, 100)
+    cross_section_resolution: float = 1.0
+    root_length_mm: int = 10
 
     def __init__(self, nifti: MircatNifti):
         super().__init__(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
@@ -239,4 +242,78 @@ class Aorta(Segmentation):
         end = max(midlines) + 1  # add one to make it inclusive
         return start, end
 
+    #### STATISTICS OPERATIONS
+    def measure_statistics(self) -> dict[str, float]:
+        """Measure the statistics for the aorta in the segmentation.
+        Returns:
+        --------
+        dict[str, float]
+            The statistics for the aorta
+        """
+        aorta_stats = {}
+        # Create the aorta centerline
+        self._create_centerline()
+        self._create_cpr()
+        self._split_regions()
+        return aorta_stats
 
+    def _create_centerline(self):
+        'Create the centerline for the aorta'
+        self.centerline = Centerline(self.anisotropic_spacing_mm)
+        abdominal = self.region_existence["abdominal"]['exists']
+        thoracic = self.region_existence["thoracic"]['exists']
+        descending = self.region_existence["descending"]['exists']
+        max_points = 0
+        window_length = 10 # mm distance for smoothing
+        if abdominal:
+            max_points += 300
+        # only use either all thoracic or descending
+        if thoracic:
+            max_points += 400
+        elif descending:
+            max_points += 200
+        self.centerline.create_centerline(self.segmentation_arr, max_points=max_points, window_length=window_length)
+    
+    def _create_cpr(self):
+        'Create the CPR for the aorta'
+        self.seg_cpr = StraightenedCPR(
+            self.segmentation_arr, 
+            self.centerline, 
+            self.cross_section_size_mm,
+            self.cross_section_resolution,
+            sigma=2,
+            is_binary=True
+        ).straighten()
+        # self.original_cpr = StraightenedCPR(
+        #     self.original_ct_arr, 
+        #     self.centerline, 
+        #     self.cross_section_size_mm,
+        #     self.cross_section_resolution,
+        #     sigma=2,
+        #     is_binary=False
+        # ).straighten()
+
+    def _split_regions(self):
+        'Split the centerline and CPR into aortic regions'
+        regions = {}
+        abdominal = self.region_existence["abdominal"]
+        thoracic = self.region_existence["thoracic"]
+        descending = self.region_existence["descending"]
+        # Split the centerline and cprs into the appropriate_regions
+        if abdominal['exists']:
+            start, end = abdominal['endpoints']
+            self.region_existence['abdominal']['indices'] = self._split_region(start, end)
+        if thoracic['exists']:
+            start, end = thoracic['endpoints']
+            self.region_existence['thoracic']['indices'] = self._split_region(start, end)
+        elif descending['exists']:
+            start, end = descending['endpoints']
+            self.region_existence['descending']['indices'] = self._split_region(start, end)
+
+    def _split_region(self, start: int, end: int):
+        'Split the centerline and CPR into a specific region'
+        valid_indicies = []
+        for i, point in enumerate(self.centerline.centerline):
+            if point[0] >= start and point[0] <= end:
+                valid_indicies.append(i)
+        return valid_indicies

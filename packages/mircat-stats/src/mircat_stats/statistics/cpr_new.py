@@ -38,6 +38,7 @@ class StraightenedCPR:
         # remove the first and last cross-sections to avoid odd cuts
         self.cpr_arr = cpr
         self.empty_slices = empty_slices
+        return self
 
     def extract_orthogonal_cross_section(self, index: int):
         """
