@@ -144,3 +144,74 @@ class StraightenedCPR:
         center_label = np.zeros_like(cross_section)
         center_label[center_region.coords[:, 0], center_region.coords[:, 1]] = 1
         return center_label
+    
+    @staticmethod
+    def measure_cross_sectional_diameter(
+    cross_section: np.ndarray, pixel_spacing: tuple, diff_threshold: int
+) -> dict[str, float]:
+        """Measure the cross-sectional diameter from a straightened cpr slice
+        :param cross_section: the binary straightened cpr slice as a numpy array
+        :param pixel_spacing: the pixel spacing of the cpr slice
+        :param diff_threshold: the maximum difference allowed between major and minor diameters.
+            If |major - minor| > diff_threshold, set the average diameter = minor diameter to be conservative
+        :return: a dictionary containing the max, major, minor diameters, as well as the solidarity, cicularity, and eccentricity
+        """
+        regions = _get_regions(cross_section)
+        data = {"max_diam": 0, "major_diam": 0, "minor_diam": 0}
+        if len(regions) == 0:
+            return data
+        region = regions[0]
+        major_endpoints, minor_endpoints = StraightenedCPR._get_cross_section_endpoints(region)
+        major_units = list(np.multiply(major_endpoints, pixel_spacing))
+        minor_units = list(np.multiply(minor_endpoints, pixel_spacing))
+        major_diam = StraightenedCPR._endpoint_euclidean_distance(major_units)
+        minor_diam = StraightenedCPR._endpoint_euclidean_distance(minor_units)
+        if abs(major_diam - minor_diam) < diff_threshold:
+            max_diam = round((major_diam + minor_diam) / 2, 1)
+        else:
+            max_diam = min(major_diam, minor_diam)
+        max_area = (cross_section == 1).sum() * np.prod(pixel_spacing)
+        data.update(
+            {
+                "max_area": max_area,
+                "max_diam": max_diam,
+                "major_diam": major_diam,
+                "minor_diam": minor_diam,
+            }
+        )
+        return data
+    
+    @staticmethod
+    def _get_cross_section_endpoints(
+        region,
+    ) -> tuple[tuple[tuple, tuple], tuple[tuple, tuple]]:
+        centroid = region.centroid
+        orientation = region.orientation
+        major_endpoints = StraightenedCPR._get_axis_endpoints(centroid, orientation, region.axis_major_length)
+        minor_endpoints = StraightenedCPR._get_axis_endpoints(centroid, orientation, region.axis_minor_length)
+        return major_endpoints, minor_endpoints
+
+    @staticmethod
+    def _get_axis_endpoints(centroid: np.array, orientation: float, axis_length: float) -> tuple[tuple, tuple]:
+        """Calculate the endpoints of the axis of a cross-section region
+        :param centroid: the region.centroid
+        :param orientation: the region.orientation
+        :param axis_length: region.axis_major_length or region.axis_minor_length
+        :return: a tuple containing the endpoints
+        """
+        y0, x0 = centroid
+        # calculate the endpoints of the major axis using the centroid
+        x1 = x0 - np.sin(orientation) * 0.5 * axis_length
+        x2 = x0 + np.sin(orientation) * 0.5 * axis_length
+        y1 = y0 - np.cos(orientation) * 0.5 * axis_length
+        y2 = y0 + np.cos(orientation) * 0.5 * axis_length
+        return (y1, x1), (y2, x2)
+
+    @staticmethod
+    def _endpoint_euclidean_distance(endpoints: list) -> float:
+        """Calculate the Euclidean distance between endpoints
+        :param endpoints: the endpoints (must be two of them)
+        :return: the Euclidean distance
+        """
+        p0, p1 = [*endpoints]
+        return round(np.sqrt(((p0 - p1) ** 2).sum()), 1)

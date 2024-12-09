@@ -257,10 +257,10 @@ class Aorta(Segmentation):
         dict[str, float]
             The statistics for the aorta
         """
-        aorta_stats = {}
         # Create the aorta centerline
         self.setup_stats()
-        return aorta_stats
+        self.measure_regions()
+        return 
 
     def setup_stats(self):
         'Set up the aorta centerline and cprs for statistics'
@@ -272,6 +272,8 @@ class Aorta(Segmentation):
         )
         if self.region_existence['thoracic']['exists']:
             self._split_thoracic_regions()
+        else:
+            self.thoracic_regions = {}
 
     def _create_centerline(self):
         'Create the centerline for the aorta'
@@ -388,11 +390,86 @@ class Aorta(Segmentation):
             if length > self.root_length_mm:
                 asc_start = i
                 break
-        thoracic_regions['ascending'] = thoracic_indices[:arch_start]
-        thoracic_regions['ascending_rootless'] = thoracic_indices[asc_start:arch_start]
+        thoracic_regions['asc_w_root'] = thoracic_indices[:arch_start]
+        thoracic_regions['asc'] = thoracic_indices[asc_start:arch_start]
         thoracic_regions['arch'] = thoracic_indices[arch_start:arch_end]
-        thoracic_regions['descending'] = thoracic_indices[arch_end:]
+        thoracic_regions['desc'] = thoracic_indices[arch_end:]
         self.thoracic_regions = thoracic_regions
         return self
         
-            
+    def measure_regions(self) -> dict[str, float]:
+        """Measure the statistics for each region of the aorta. 
+        These include maximum diameter, maximum area, length, calcification and periaortic fat.
+        Returns:
+        --------
+        dict[str, float]
+            The statistics for the aorta regions
+        """
+        region_stats = {}
+        if self.thoracic_regions:
+            for region in self.thoracic_regions:
+                if region == 'asc_w_root':
+                    continue
+                indices = self.thoracic_regions[region]
+                region_stats.update(self._measure_region(region, indices))
+        for region in self.region_existence:
+            pass
+        self.region_stats = region_stats
+        return self
+
+
+    def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
+        'Measure the statistics for a specific region of the aorta'
+        region_stats = {}
+        region_centerline = self.centerline.centerline[indices]
+        region_cumulative_lengths = self.centerline.cumulative_lengths[indices]
+        region_cpr = self.seg_cpr.cpr_arr[indices]
+        if hasattr(self, 'original_cpr'):
+            region_original_cpr = self.original_cpr.cpr_arr[indices]
+        diameters = self._measure_diameters(region_cpr)
+        region_stats.update({f'{region}_{k}': v for k, v in diameters.items()})
+        return region_stats
+    
+    def _measure_diameters(self, cpr: np.ndarray) -> dict[str, float]:
+        '''Measure the maximum, proximal, mid, and distal diameters of the aortic region
+        Parameters
+        ----------
+        cpr: np.ndarray
+            The CPR array for the region
+        '''
+        out_keys = ['max_area', 'max_diam']
+        mid_idx = len(cpr) // 2
+        # measure the proximal aortic diameter
+        proximal = StraightenedCPR.measure_cross_sectional_diameter(cpr[1], self.cross_section_spacing_mm, diff_threshold=5)
+        proximal = {k.replace("max_", "prox_"): proximal[k] for k in out_keys}
+        # measure the mid aortic diameter
+        mid = StraightenedCPR.measure_cross_sectional_diameter(cpr[mid_idx], self.cross_section_spacing_mm, diff_threshold=5)
+        mid = {k.replace("max_", "mid_"): mid[k] for k in out_keys}
+        # measure the distal aortic diameter
+        distal = StraightenedCPR.measure_cross_sectional_diameter(cpr[-2], self.cross_section_spacing_mm, diff_threshold=5)
+        distal = {k.replace("max_", "dist_"): distal[k] for k in out_keys}
+        # measure the maximum aortic diameter
+        max_diams = []
+        max_areas = []
+        major_diams = []
+        minor_diams = []
+        for cross_section in cpr:
+            diam = StraightenedCPR.measure_cross_sectional_diameter(cross_section, self.cross_section_spacing_mm, diff_threshold=5)
+            max_areas.append(diam['max_area'])
+            max_diams.append(diam['max_diam'])
+            major_diams.append(diam['major_diam'])
+            minor_diams.append(diam['minor_diam'])
+        if max_diams:
+            largest_idx = np.argmax(max_diams)
+            max_ = {
+                'max_area': max_areas[largest_idx],
+                'avg_diam': max_diams[largest_idx],
+                'major_diam': major_diams[largest_idx],
+                'minor_diam': minor_diams[largest_idx]
+            }
+        else:
+            max_ = {}
+        return {**max_, **proximal, **mid, **distal}
+
+
+    
