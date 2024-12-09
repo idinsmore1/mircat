@@ -5,7 +5,7 @@ from loguru import logger
 from mircat_stats.configs.logging import timer
 from mircat_stats.statistics.centerline_new import Centerline
 from mircat_stats.statistics.nifti import MircatNifti
-from mircat_stats.statistics.segmentation import Segmentation, SegNotFoundError
+from mircat_stats.statistics.segmentation import Aorta, SegNotFoundError
 
 
 # This is the list of all vertebrae that could potentially show in specific regions of the aorta
@@ -36,22 +36,17 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
         The statistics for the aorta
     """
     aorta_stats: dict[str, float] = {}
-    vert_midlines: dict[str, int] = nifti.vert_midlines
-    region_existence: dict[str, bool] = _check_aortic_regions_in_segmentation(vert_midlines)
-    if not any(region_existence.values()):
-        logger.warning(f"No aortic regions found in {nifti.path}")
-        return aorta_stats
-
     # Filter to the segmentations we need
     try:
-        aorta = Segmentation(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
-        aorta_seg: sitk.Image = aorta.segmentation
-        aorta_img: sitk.Image = aorta.original_ct
+        aorta = Aorta(nifti)
     except SegNotFoundError as e:
         logger.opt(exception=True).error(f"No aorta found in {nifti.path}")
         return aorta_stats
     except Exception as e:
         logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}")
+        return aorta_stats
+    
+    if not aorta.region_existence:
         return aorta_stats
 
     # Go through each region and measure it

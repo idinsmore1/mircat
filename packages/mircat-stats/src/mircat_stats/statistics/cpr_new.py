@@ -17,20 +17,27 @@ class StraightenedCPR:
     resolution: float
     sigma: int
     is_binary: bool
-    is_thoracic_aorta: bool
 
     def straighten(self):
         """
         Straighten the image
         """
         cpr = []
+        empty_slices = []
         for i in range(len(self.centerline.centerline)):
             cross_section = self.extract_orthogonal_cross_section(i)
             if self.is_binary:
                 cross_section = StraightenedCPR._postprocess_cross_section(cross_section, self.sigma)
+                if cross_section.sum() == 0:
+                    empty_slices.append(1)
+                else:
+                    empty_slices.append(0)
             cpr.append(cross_section)
+            
         cpr = np.stack(cpr, axis=0)
-        self.cpr = cpr
+        # remove the first and last cross-sections to avoid odd cuts
+        self.cpr_arr = cpr
+        self.empty_slices = empty_slices
 
     def extract_orthogonal_cross_section(self, index: int):
         """
@@ -67,7 +74,7 @@ class StraightenedCPR:
             # Initialize an empty slice with zeros (padding)
             slice_2d = np.zeros((int(height / resolution), int(width / resolution)), dtype=arr.dtype)
             if arr.min() != 0:
-                slice_2d = slice_2d + arr.min()
+                slice_2d += arr.min()
             # Compute valid index ranges considering the boundaries
             valid_x = (slice_points[..., 0] >= 0) & (slice_points[..., 0] < arr.shape[0])
             valid_y = (slice_points[..., 1] >= 0) & (slice_points[..., 1] < arr.shape[1])

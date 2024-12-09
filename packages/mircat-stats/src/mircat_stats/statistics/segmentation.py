@@ -47,6 +47,7 @@ class Segmentation:
             segmentation: Filtered segmentation image
             seg_names: List of segmentation names in output
         """
+        self.path = nifti.path
         self.original_ct = nifti.original_ct
         self.vert_midlines = nifti.vert_midlines
         self.seg_folder = nifti.seg_folder
@@ -159,28 +160,81 @@ class Segmentation:
         return cropped_seg, cropped_img
 
 
-class Vessel(Segmentation):
-    """Child class of Segmentation to filter one or multiple vessel segmentations out from a single model and
-    hold them in a single object. This is useful for specific morphology-based statistics. Has specific implementations of centerline and CPR generation.
-    """
+class Aorta(Segmentation):
+    # This is the list of all vertebrae that could potentially show in specific regions of the aorta
+    vertebral_regions_map: dict = {
+        "abdominal": [*[f"L{i}" for i in range(1, 6)], "T12L1"],
+        "thoracic": [f"T{i}" for i in range(3, 13)],
+        "descending": [f"T{i}" for i in range(5, 13)],
+    }
+    # These are the default values for the aorta
+    cross_section_spacing_mm: tuple = (1, 1)
+    root_length_mm: int = 10
+    anisotropic_spacing_mm: tuple = (1, 1, 1)
+    cross_section_size_mm: tuple = (100, 100)
 
-    def __init__(self, nifti: MircatNifti, seg_names: list[str]):
-        """Initialize Vessel class.
+    def __init__(self, nifti: MircatNifti):
+        super().__init__(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
+        self._check_aortic_regions_in_segmentation()
+        self._make_aorta_superior_numpy_array()
+        self._get_region_endpoints()
 
-        This class handles filtering and potentially analysis of segmented CT images.
-        It will load and filter the appropriate complete segmentation on initialization.
 
-        Args:
-            nifti (MircatNifti): A MircatNifti object containing CT and segmentation data
-            seg_names (list[str]): List of segmentation names to analyze
-
-        Attributes:
-            original_ct: Original CT image data
-            vert_midlines: Vertebrae midline data
-            seg_folder: Folder containing segmentation files
-            seg_info: Dictionary containing segmentation information
-            model: Model used for segmentation
-            segmentation: Filtered segmentation image
-            seg_names: List of segmentation names in output
+    def _check_aortic_regions_in_segmentation(self) -> dict[str, bool]:
+        """Check if the aortic regions are present in the segmentation.
+        Returns:
+        --------
+        dict[str, bool]
+            Dictionary with keys as region names and values as boolean indicating if the region is present
         """
-        super().__init__(nifti, seg_names)
+        vert_midlines = self.vert_midlines
+            # T4 and at least T8 need to be in the image for thoracic to be measured
+        thoracic = bool(vert_midlines.get("vertebrae_T8_midline", False) and vert_midlines.get("vertebrae_T4_midline", False))
+        # L3 has to be in the image for abdominal to be measured
+        abdominal = bool(vert_midlines.get("vertebrae_L3_midline", False))
+        # If at least the T12 and T9 are in the image, then we can measure the descending separate from the ascending
+        descending = bool(vert_midlines.get("vertebrae_T12_midline", False) and vert_midlines.get("vertebrae_T9_midline", False))
+        region_existence = {
+            "thoracic": {
+                'exists': thoracic, 
+            },
+            "abdominal": {
+                'exists': abdominal, 
+            },
+            "descending": {
+                'exists': descending, 
+            }
+        }
+        self.region_existence = region_existence
+        if not any([region_existence[region]['exists'] for region in region_existence]):
+            raise SegNotFoundError(f"No aortic regions found in {self.path}")
+        return self
+
+    def _make_aorta_superior_numpy_array(self) -> None:
+        """Convert the aorta segmentation to a numpy array with the arch at the top and adjust vertebral midlines"""
+        self.segmentation_arr = np.flipud(sitk.GetArrayFromImage(self.segmentation))
+        self.original_ct_arr = np.flipud(sitk.GetArrayFromImage(self.original_ct))
+        # Adjust the vertebral midlines to account for the flip
+        new_midlines = {k: (self.segmentation_arr.shape[0] - 1) - v for k, v in self.vert_midlines.items()}
+        self.vert_midlines = new_midlines
+
+    def _get_region_endpoints(self) -> None:
+        for region, has_region in self.region_existence.items():
+            if has_region:
+                endpoints = self._find_aortic_region_endpoints(region, self.vert_midlines)
+                self.region_existence[region]['endpoints'] = endpoints
+    
+    @staticmethod
+    def _find_aortic_region_endpoints(region: str, vert_midlines: dict) -> tuple[int, int]:
+        possible_locs = Aorta.vertebral_regions_map[region]
+        midlines = [
+            vert_midlines.get(f"vertebrae_{vert}_midline")
+            for vert in possible_locs
+            if vert_midlines.get(f"vertebrae_{vert}_midline") is not None
+        ]
+        midlines = [midline for midline in midlines if midline]
+        start = min(midlines)
+        end = max(midlines) + 1  # add one to make it inclusive
+        return start, end
+
+
