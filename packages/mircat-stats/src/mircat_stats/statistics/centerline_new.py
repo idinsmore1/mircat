@@ -177,7 +177,7 @@ class Centerline:
                 The sigma value for the gaussian smoothing. Default = 1.0
         """
         min_points = kwargs.get("min_points", 25)
-        max_points = kwargs.get("max_points", 150)
+        max_points = kwargs.get("max_points", 200)
         smoothing_factor = kwargs.get("smoothing_factor", 0.5)
         gaussian_sigma = kwargs.get("gaussian_sigma", 1.0)
         window_length = kwargs.get("window_length", 10)
