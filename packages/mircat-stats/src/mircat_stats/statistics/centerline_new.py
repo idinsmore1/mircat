@@ -369,3 +369,57 @@ class Centerline:
         v1s = np.vstack(v1s)
         v2s = np.vstack(v2s)
         self.binormal_vectors = v1s, v2s
+
+
+def calculate_tortuosity(centerline_arr: np.ndarray) -> dict[str, float]:
+    """Calculate the tortuosity of a centerline
+    Parameters:
+    -----------
+    centerline_arr : np.ndarray
+        The centerline to calculate the tortuosity for
+    Returns:
+    --------
+    dict[str, float]
+        The following metrics of tortuosity of the centerline
+        tortuosity_index: total length / euclidean distance
+        sum_of_angles: sum of angles between tangent vectors divided by centerline length
+
+    SOAM and TI Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC2430603/#S6
+    """
+    segments = np.diff(centerline_arr, axis=0)
+    segment_lengths = np.linalg.norm(segments, axis=1)
+    cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
+    total_length = cumulative_lengths[-1]
+    euclidean_distance = np.linalg.norm(centerline_arr[-1] - centerline_arr[0])
+    tortuosity_index = total_length / euclidean_distance if euclidean_distance > 0 else float('inf')
+    # Calculate the sum of angles
+    cs = CubicSpline(cumulative_lengths, centerline_arr, bc_type="natural")
+    tangents = cs(cumulative_lengths, 1)
+    total_angles = _get_total_angles(tangents)
+    soam = np.sum(total_angles) / total_length
+    return {"tortuosity_index": round(tortuosity_index, 1), "soam": round(soam, 1)}
+
+def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
+    """
+    Calculate the array of total curvature angles
+    """
+    n = len(tangents)
+    total_angles = np.zeros(n - 3)
+    norm_tangents = tangents / np.linalg.norm(tangents, axis=1)[:, None]
+    # You need to start and 1 and go to n-2 as k+2 is the last index
+    for k in range(1, n-2):
+        t1 = tangents[k]
+        t2 = tangents[k+1]
+        t3 = tangents[k+2]
+        n1 = norm_tangents[k]
+        n2 = norm_tangents[k+1]
+        # calculate in-plane angle
+        ip = np.arccos(np.dot(n1, n2))
+        # calculate the torsional angle
+        v1 = np.cross(t1, t2) / np.linalg.norm(np.cross(t1, t2))
+        v2 = np.cross(t2, t3) / np.linalg.norm(np.cross(t2, t3))
+        tp = np.arccos(np.dot(v1, v2))
+        # calculate the total angle
+        cp = np.sqrt(ip**2 + tp**2)
+        total_angles[k-1] = cp
+    return total_angles

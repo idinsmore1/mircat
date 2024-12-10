@@ -3,26 +3,11 @@ import SimpleITK as sitk
 
 from loguru import logger
 from mircat_stats.configs.logging import timer
-from mircat_stats.statistics.centerline_new import Centerline
+from mircat_stats.statistics.centerline_new import Centerline, calculate_tortuosity
 from mircat_stats.statistics.cpr_new import StraightenedCPR
 from mircat_stats.statistics.nifti import MircatNifti
-from mircat_stats.statistics.segmentation import Segmentation, SegNotFoundError
+from mircat_stats.statistics.segmentation import Segmentation, SegNotFoundError, ArchNotFoundError
 from mircat_stats.statistics.utils import _get_regions
-
-
-# This is the list of all vertebrae that could potentially show in specific regions of the aorta
-AORTA_REGIONS_VERT_MAP: dict = {
-    "abdominal": [*[f"L{i}" for i in range(1, 6)], "T12L1"],
-    "thoracic": [f"T{i}" for i in range(1, 13)],
-    "descending": [f"T{i}" for i in range(5, 13)],
-}
-# These are the default values for the aorta
-AORTA_CROSS_SECTION_SPACING_MM: tuple = (1, 1)
-AORTA_ROOT_LENGTH_MM: int = 10
-AORTA_LABEL: int = 1
-AORTA_ANISOTROPIC_SPACING_MM: tuple = (1, 1, 1)
-AORTIC_CROSS_SECTION_SPACING_MM: tuple = (1, 1)
-AORTIC_CROSS_SECTION_SIZE_MM: tuple = (100, 100)
 
 
 @timer
@@ -49,6 +34,7 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     # Calculate the aorta statistics
     aorta_stats = aorta.measure_statistics()
 
+
 class Aorta(Segmentation):
     # This is the list of all vertebrae that could potentially show in specific regions of the aorta
     vertebral_regions_map: dict = {
@@ -61,7 +47,7 @@ class Aorta(Segmentation):
     cross_section_spacing_mm: tuple = (1, 1)
     cross_section_size_mm: tuple = (100, 100)
     cross_section_resolution: float = 1.0
-    root_length_mm: int = 10
+    root_length_mm: int = 20
 
     def __init__(self, nifti: MircatNifti):
         super().__init__(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
@@ -102,10 +88,8 @@ class Aorta(Segmentation):
 
     def _make_aorta_superior_numpy_array(self) -> None:
         """Convert the aorta segmentation to a numpy array with the arch at the top and adjust vertebral midlines"""
-        self.segmentation_arr = np.flipud(sitk.GetArrayFromImage(self.segmentation))
-        self.original_ct_arr = np.flipud(sitk.GetArrayFromImage(self.original_ct))
-        # Clip the houndsfield units for fat analysis
-        self.original_ct_arr = np.clip(self.original_ct_arr, -200, 250)
+        self.segmentation_arr = np.flip(np.flipud(sitk.GetArrayFromImage(self.segmentation)), axis=1)
+        self.original_ct_arr = np.flip(np.flipud(sitk.GetArrayFromImage(self.original_ct)), axis=1)
         # Adjust the vertebral midlines to account for the flip
         new_midlines = {k: (self.segmentation_arr.shape[0] - 1) - v for k, v in self.vert_midlines.items()}
         self.vert_midlines = new_midlines
@@ -139,7 +123,7 @@ class Aorta(Segmentation):
         """
         # Create the aorta centerline
         self.setup_stats()
-        self.measure_regions()
+        self._measure_aorta()
         return 
 
     def setup_stats(self):
@@ -271,13 +255,13 @@ class Aorta(Segmentation):
                 asc_start = i
                 break
         thoracic_regions['asc_w_root'] = thoracic_indices[:arch_start]
-        thoracic_regions['asc'] = thoracic_indices[asc_start:arch_start]
-        thoracic_regions['arch'] = thoracic_indices[arch_start:arch_end]
-        thoracic_regions['desc'] = thoracic_indices[arch_end:]
+        thoracic_regions['asc_aorta'] = thoracic_indices[asc_start:arch_start]
+        thoracic_regions['aortic_arch'] = thoracic_indices[arch_start:arch_end]
+        thoracic_regions['desc_aorta'] = thoracic_indices[arch_end:]
         self.thoracic_regions = thoracic_regions
         return self
         
-    def measure_regions(self) -> dict[str, float]:
+    def _measure_aorta(self) -> dict[str, float]:
         """Measure the statistics for each region of the aorta. 
         These include maximum diameter, maximum area, length, calcification and periaortic fat.
         Returns:
@@ -285,18 +269,23 @@ class Aorta(Segmentation):
         dict[str, float]
             The statistics for the aorta regions
         """
-        region_stats = {}
+        aorta_stats = {}
+        # Get the total aortic stats first
+        total_stats = self._measure_region('aorta', [i for i in range(len(self.centerline.centerline))])
+        aorta_stats.update(total_stats)
         if self.thoracic_regions:
             for region in self.thoracic_regions:
                 if region == 'asc_w_root':
                     continue
                 indices = self.thoracic_regions[region]
-                region_stats.update(self._measure_region(region, indices))
+                aorta_stats.update(self._measure_region(region, indices))
         elif self.region_existence['descending']['exists']:
-            region_stats.update(self._measure_region('desc', self.region_existence['descending']['indices']))
+            aorta_stats.update(self._measure_region('', self.region_existence['descending']['indices']))
+        
         if self.region_existence['abdominal']['exists']:
-            region_stats.update(self._measure_region('abd', self.region_existence['abdominal']['indices']))
-        self.region_stats = region_stats
+            aorta_stats.update(self._measure_region('abd_aorta', self.region_existence['abdominal']['indices']))
+        # Set the aorta stats
+        self.aorta_stats = aorta_stats
         return self
 
     def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
@@ -308,10 +297,22 @@ class Aorta(Segmentation):
         region_cpr = (self.seg_cpr.cpr_arr[indices] == 1).astype(np.uint8)
         if hasattr(self, 'original_cpr'):
             region_original_cpr = self.original_cpr.cpr_arr[indices]
+        # Region Length
+        region_length = round(region_cumulative_lengths[-1], 0)
+        region_stats[f'{region}_length_mm'] = region_length
+        # Region tortuosity
+        region_tortuosity = calculate_tortuosity(region_centerline)
+        region_stats.update({f'{region}_{k}': v for k, v in region_tortuosity.items()})
+        # Diameters and areas
+        if region == 'aorta':
+            return region_stats
+        
         diameters, max_idx = self._measure_diameters(region_cpr)
         if max_idx is not None:
-            diameters['max_diam_from_start_mm'] = round(region_cumulative_lengths[max_idx], 0)
-            diameters['max_diam_rel_distance'] = round(max_idx / len(region_cpr), 2) * 100
+            max_distance = round(region_cumulative_lengths[max_idx], 0)
+            rel_distance = round(max_distance / region_length, 3) * 100
+            diameters['max_diam_from_start_mm'] = max_distance
+            diameters['max_diam_rel_distance'] = rel_distance
         region_stats.update({f'{region}_{k}': v for k, v in diameters.items()})
         return region_stats
     
