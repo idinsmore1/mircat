@@ -96,10 +96,10 @@ class Aorta(Segmentation):
         self.vert_midlines = new_midlines
 
     def _get_region_endpoints(self) -> None:
-        for region, has_region in self.region_existence.items():
-            if has_region:
-                endpoints = self._find_aortic_region_endpoints(region, self.vert_midlines)
-                self.region_existence[region]['endpoints'] = endpoints
+        for region_name, region in self.region_existence.items():
+            if region['exists']:
+                endpoints = self._find_aortic_region_endpoints(region_name, self.vert_midlines)
+                self.region_existence[region_name]['endpoints'] = endpoints
     
     @staticmethod
     def _find_aortic_region_endpoints(region: str, vert_midlines: dict) -> tuple[int, int]:
@@ -241,6 +241,8 @@ class Aorta(Segmentation):
             if split is None:
                 logger.error("Could not define the aortic arch")
                 raise ArchNotFoundError("Could not define the aortic arch")
+            arch_start = None
+            arch_end = None
             for i, point in enumerate(thoracic_centerline):
                 if point[0] <= split:
                     arch_start = i
@@ -249,6 +251,9 @@ class Aorta(Segmentation):
                 if point[0] <= split:
                     arch_end = len(thoracic_centerline) - i
                     break
+            if arch_start is None or arch_end is None:
+                logger.error("Could not define the aortic arch")
+                raise ArchNotFoundError("Could not define the aortic arch")
         # Remove the aortic root from the ascending aorta by looking at cumulative length
         asc_start = 0
         for i, length in enumerate(thoracic_cumulative_lengths):
@@ -348,12 +353,12 @@ class Aorta(Segmentation):
         minor_diams = []
         for cross_section in cpr:
             diam = StraightenedCPR.measure_cross_sectional_diameter(cross_section, self.cross_section_spacing_mm, diff_threshold=5)
-            max_areas.append(diam['max_area'])
-            max_diams.append(diam['max_diam'])
-            major_diams.append(diam['major_diam'])
-            minor_diams.append(diam['minor_diam'])
+            max_areas.append(diam.get('max_area', np.nan))
+            max_diams.append(diam.get('max_diam', np.nan))
+            major_diams.append(diam.get('major_diam', np.nan))
+            minor_diams.append(diam.get('minor_diam', np.nan))
         if max_diams:
-            largest_idx = np.argmax(max_diams)
+            largest_idx = np.nanargmax(max_diams)
             max_ = {
                 'max_area': max_areas[largest_idx],
                 'avg_diam': max_diams[largest_idx],

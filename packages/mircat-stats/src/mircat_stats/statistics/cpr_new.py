@@ -157,7 +157,7 @@ class StraightenedCPR:
         :return: a dictionary containing the max, major, minor diameters, as well as the solidarity, cicularity, and eccentricity
         """
         regions = _get_regions(cross_section)
-        data = {"max_diam": 0, "major_diam": 0, "minor_diam": 0}
+        data = {"max_area": np.nan, "max_diam": np.nan, "major_diam": np.nan, "minor_diam": np.nan}
         if len(regions) == 0:
             return data
         region = regions[0]

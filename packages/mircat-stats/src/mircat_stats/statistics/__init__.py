@@ -199,18 +199,18 @@ def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bo
                 "body_and_tissues_time": None,
             },
         )
-    except Exception as e:
-        logger.error(
-            f"Stats for {input_nifti} failed. {e}",
-            extra={
-                "key": "statistics",
-                "input_nifti": input_nifti,
-                "completed": False,
-                "failed_reason": "unknown",
-                "output_file": None,
-                "contrast_pred_time": None,
-                "total_stats_time": None,
-                "aorta_stats_time": None,
-                "body_and_tissues_time": None,
-            },
-        )
+    # except Exception as e:
+    #     logger.error(
+    #         f"Stats for {input_nifti} failed. {e}",
+    #         extra={
+    #             "key": "statistics",
+    #             "input_nifti": input_nifti,
+    #             "completed": False,
+    #             "failed_reason": "unknown",
+    #             "output_file": None,
+    #             "contrast_pred_time": None,
+    #             "total_stats_time": None,
+    #             "aorta_stats_time": None,
+    #             "body_and_tissues_time": None,
+    #         },
+    #     )
