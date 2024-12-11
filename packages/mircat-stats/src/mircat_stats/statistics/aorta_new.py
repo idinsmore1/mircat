@@ -33,6 +33,7 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
         return {}
     # Calculate the aorta statistics
     aorta_stats = aorta.measure_statistics()
+    return aorta_stats
 
 
 class Aorta(Segmentation):
@@ -124,7 +125,7 @@ class Aorta(Segmentation):
         # Create the aorta centerline
         self.setup_stats()
         self._measure_aorta()
-        return 
+        return self.aorta_stats
 
     def setup_stats(self):
         'Set up the aorta centerline and cprs for statistics'
@@ -310,7 +311,7 @@ class Aorta(Segmentation):
         diameters, max_idx = self._measure_diameters(region_cpr)
         if max_idx is not None:
             max_distance = round(region_cumulative_lengths[max_idx], 0)
-            rel_distance = round(max_distance / region_length, 3) * 100
+            rel_distance = round((max_distance / region_length) * 100, 1)
             diameters['max_diam_from_start_mm'] = max_distance
             diameters['max_diam_rel_distance'] = rel_distance
         region_stats.update({f'{region}_{k}': v for k, v in diameters.items()})

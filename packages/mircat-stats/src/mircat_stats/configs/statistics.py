@@ -1,4 +1,4 @@
-diam_names = ["prox_diam", "mid_diam", "dist_diam", "avg_diam", "major_diam", "minor_diam"]
+aorta_names = ["length_mm", "tortuosity_index", "soam", "max_area", "prox_diam", "mid_diam", "dist_diam", "avg_diam", "major_diam", "minor_diam", "max_diam_from_start_mm", "max_diam_rel_distance"]
 stats_output_keys = [
     "nifti_path",
     "mrn",
@@ -175,10 +175,13 @@ stats_output_keys = [
     "vertebrae_T12L1_midline",  # This is a special case for between the T12 and L1 for determining abdominal aorta size
     *[f"vertebrae_T{i}_midline" for i in range(12, 0, -1)],
     *[f"vertebrae_C{i}_midline" for i in range(7, 0, -1)],
-    *[f"asc_aorta_{diam}" for diam in diam_names],
-    *[f"aortic_arch_{diam}" for diam in diam_names],
-    *[f"desc_aorta_{diam}" for diam in diam_names],
-    *[f"abd_aorta_{diam}" for diam in diam_names],
+    "aorta_length_mm",
+    "aorta_tortuosity_index",
+    "aorta_soam",
+    *[f"asc_aorta_{diam}" for diam in aorta_names],
+    *[f"aortic_arch_{diam}" for diam in aorta_names],
+    *[f"desc_aorta_{diam}" for diam in aorta_names],
+    *[f"abd_aorta_{diam}" for diam in aorta_names],
     # 'asc_root_fat_region_volume_cm3',
     # 'asc_root_fat_volume_cm3',
     # 'asc_root_mean_hu',

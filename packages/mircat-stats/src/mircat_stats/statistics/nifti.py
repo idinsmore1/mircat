@@ -14,10 +14,11 @@ Functions:
 """
 
 import json
+import numpy as np
 import SimpleITK as sitk
+
 from pathlib import Path
 from loguru import logger
-from numpy import median
 
 from mircat_stats.configs.statistics import stats_output_keys, midline_keys
 from mircat_stats.configs.models import torch_model_configs
@@ -210,7 +211,7 @@ class MircatNifti:
             if label in seg_labels:
                 indices = shape_stats.GetIndexes(label)
                 z_indices = indices[2::3]
-                vert_midlines[f"{name}_midline"] = int(median(z_indices))
+                vert_midlines[f"{name}_midline"] = int(np.median(z_indices))
         if "vertebrae_L1_midline" in vert_midlines and "vertebrae_T12_midline" in vert_midlines:
             vert_midlines["vertebrae_T12L1_midline"] = int(
                 (vert_midlines["vertebrae_L1_midline"] + vert_midlines["vertebrae_T12_midline"]) / 2
@@ -233,7 +234,16 @@ class MircatNifti:
         if all_completed:
             flag_file = str(self.output_file).replace("_stats.json", ".complete")
             Path(flag_file).touch()
-        output_stats = {k: output_stats.get(k) for k in stats_output_keys}
+        holder_stats = {k: output_stats.get(k) for k in stats_output_keys}
+        output_stats = {}
+        for key, value in holder_stats.items():
+            if isinstance(value, np.integer):
+                value = int(value)
+            if isinstance(value, np.floating):
+                value = float(value)
+            if isinstance(value, np.ndarray):
+                value = value.tolist()
+            output_stats[key] = value
         with self.output_file.open("w") as f:
             json.dump(output_stats, f, indent=4)
 
