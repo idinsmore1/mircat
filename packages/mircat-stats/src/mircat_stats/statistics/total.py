@@ -1,5 +1,3 @@
-import numpy as np
-
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import timer
 from mircat_stats.statistics.nifti import MircatNifti

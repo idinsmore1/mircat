@@ -1,7 +1,5 @@
-from os import environ
 from time import time
 from functools import partial
-from numpy import array_split
 from loguru import logger
 from tqdm import tqdm
 from multiprocessing import Pool
@@ -9,7 +7,7 @@ from threadpoolctl import threadpool_limits
 
 from .nifti import MircatNifti as MircatNifti
 from .nifti import TotalSegNotFoundError, BodySegNotFoundError, TissuesSegNotFoundError
-from .aorta_new import calculate_aorta_stats as calculate_aorta_stats
+from .aorta import calculate_aorta_stats as calculate_aorta_stats
 from .total import calculate_total_segmentation_stats as calculate_total_stats
 from .body_and_tissues import (
     calculate_body_and_tissues_stats as calculate_body_and_tissues_stats,

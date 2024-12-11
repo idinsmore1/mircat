@@ -1,12 +1,11 @@
 import argparse
 from loguru import logger
 from pathlib import Path
-from mircat_stats.configs.logging import configure_logging, get_project_root
+from mircat_stats.configs.logging import configure_logging
 from mircat_stats.configs import set_num_threads
 from threadpoolctl import threadpool_limits
 from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
 from mircat_stats.statistics import calculate_nifti_stats
-import shutil
 
 
 def mircat_stats():

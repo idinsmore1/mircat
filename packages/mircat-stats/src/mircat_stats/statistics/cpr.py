@@ -1,16 +1,17 @@
 import numpy as np
 
 from dataclasses import dataclass
-from loguru import logger
 from scipy.interpolate import interpn
 from mircat_stats.statistics.centerline import Centerline
 from mircat_stats.statistics.utils import _get_regions
 from skimage.filters import gaussian
 from skimage.morphology import remove_small_holes
 
+
 @dataclass
 class StraightenedCPR:
     """Class for creating and representing a Straightened Curved Planar Reformation"""
+
     img: np.ndarray
     centerline: Centerline
     cross_section_dim: tuple
@@ -33,7 +34,7 @@ class StraightenedCPR:
                 else:
                     empty_slices.append(0)
             cpr.append(cross_section)
-            
+
         cpr = np.stack(cpr, axis=0)
         # remove the first and last cross-sections to avoid odd cuts
         self.cpr_arr = cpr
@@ -63,7 +64,7 @@ class StraightenedCPR:
         if v1 is None or v2 is None:
             raise ValueError("Invalid normal vectors")
         width, height = self.cross_section_dim
-        resolution = self.resolution   
+        resolution = self.resolution
         # Create a mesh grid to hold the output
         x_lin = np.linspace(-width / 2, width / 2, int(width / resolution))
         y_lin = np.linspace(-height / 2, height / 2, int(height / resolution))
@@ -117,7 +118,9 @@ class StraightenedCPR:
         :param label: the label to filter
         :return: a numpy array containing the filtered cross-section
         """
-        tmp_cross_section = cross_section.copy()  # Create a temporary array, so we don't change the original cross-section
+        tmp_cross_section = (
+            cross_section.copy()
+        )  # Create a temporary array, so we don't change the original cross-section
         tmp_cross_section[tmp_cross_section != label] = 0  # set anything that is not the desired label to 0
         tmp_cross_section[tmp_cross_section == label] = 1  # set the label to 1 for easier replacement later
         regions = _get_regions(tmp_cross_section)
@@ -144,11 +147,11 @@ class StraightenedCPR:
         center_label = np.zeros_like(cross_section)
         center_label[center_region.coords[:, 0], center_region.coords[:, 1]] = 1
         return center_label
-    
+
     @staticmethod
     def measure_cross_sectional_diameter(
-    cross_section: np.ndarray, pixel_spacing: tuple, diff_threshold: int
-) -> dict[str, float]:
+        cross_section: np.ndarray, pixel_spacing: tuple, diff_threshold: int
+    ) -> dict[str, float]:
         """Measure the cross-sectional diameter from a straightened cpr slice
         :param cross_section: the binary straightened cpr slice as a numpy array
         :param pixel_spacing: the pixel spacing of the cpr slice
@@ -180,7 +183,7 @@ class StraightenedCPR:
             }
         )
         return data
-    
+
     @staticmethod
     def _get_cross_section_endpoints(
         region,

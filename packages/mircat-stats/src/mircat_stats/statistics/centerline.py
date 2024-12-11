@@ -5,7 +5,6 @@ from kimimaro import skeletonize
 from scipy.interpolate import splprep, splev, CubicSpline
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import savgol_filter
-from mircat_stats.statistics.cpr import _compute_tangent_vectors
 
 
 class Centerline:
@@ -391,13 +390,14 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> dict[str, float]:
     cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
     total_length = cumulative_lengths[-1]
     euclidean_distance = np.linalg.norm(centerline_arr[-1] - centerline_arr[0])
-    tortuosity_index = total_length / euclidean_distance if euclidean_distance > 0 else float('inf')
+    tortuosity_index = total_length / euclidean_distance if euclidean_distance > 0 else float("inf")
     # Calculate the sum of angles
     cs = CubicSpline(cumulative_lengths, centerline_arr, bc_type="natural")
     tangents = cs(cumulative_lengths, 1)
     total_angles = _get_total_angles(tangents)
     soam = np.sum(total_angles) / total_length
     return {"tortuosity_index": round(tortuosity_index, 1), "soam": round(soam, 1)}
+
 
 def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
     """
@@ -407,12 +407,12 @@ def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
     total_angles = np.zeros(n - 3)
     norm_tangents = tangents / np.linalg.norm(tangents, axis=1)[:, None]
     # You need to start and 1 and go to n-2 as k+2 is the last index
-    for k in range(1, n-2):
+    for k in range(1, n - 2):
         t1 = tangents[k]
-        t2 = tangents[k+1]
-        t3 = tangents[k+2]
+        t2 = tangents[k + 1]
+        t3 = tangents[k + 2]
         n1 = norm_tangents[k]
-        n2 = norm_tangents[k+1]
+        n2 = norm_tangents[k + 1]
         # calculate in-plane angle
         ip = np.arccos(np.dot(n1, n2))
         # calculate the torsional angle
@@ -421,5 +421,5 @@ def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
         tp = np.arccos(np.dot(v1, v2))
         # calculate the total angle
         cp = np.sqrt(ip**2 + tp**2)
-        total_angles[k-1] = cp
+        total_angles[k - 1] = cp
     return total_angles

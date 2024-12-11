@@ -2,7 +2,6 @@ import json
 import numpy as np
 import dicom2nifti
 import dicom2nifti.settings as settings
-from warnings import filterwarnings
 
 from datetime import datetime
 from dicom2nifti.convert_dir import _remove_accents
@@ -306,7 +305,7 @@ class DicomFolder:
                 f"Dicom folder {self.path} could not be accessed due to a permission error {str(e)}",
                 extra=extra_dict,
             )
-        except AttributeError as e:
+        except AttributeError:
             extra_dict["failed_reason"] = "attribute_error"
             logger.error(
                 f"Dicom folder {self.path} does not have the necessary attributes",

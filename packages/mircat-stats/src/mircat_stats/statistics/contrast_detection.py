@@ -8,7 +8,6 @@ from scipy import ndimage as ndi
 from xgboost import XGBClassifier
 
 from loguru import logger
-from warnings import filterwarnings, catch_warnings
 from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import get_project_root, timer

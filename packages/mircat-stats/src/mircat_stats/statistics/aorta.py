@@ -25,10 +25,10 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     # Filter to the segmentations we need
     try:
         aorta = Aorta(nifti)
-    except SegNotFoundError as e:
+    except SegNotFoundError:
         logger.opt(exception=True).error(f"No aorta found in {nifti.path}")
         return {}
-    except Exception as e:
+    except Exception:
         logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}")
         return {}
     # Calculate the aorta statistics
@@ -56,7 +56,7 @@ class Aorta(Segmentation):
         self._make_aorta_superior_numpy_array()
         self._get_region_endpoints()
 
-    #### INITIALIZATION OPERATIONS 
+    #### INITIALIZATION OPERATIONS
     def _check_aortic_regions_in_segmentation(self) -> dict[str, bool]:
         """Check if the aortic regions are present in the segmentation.
         Returns:
@@ -68,22 +68,26 @@ class Aorta(Segmentation):
         # L3 has to be in the image for abdominal to be measured
         abdominal = bool(vert_midlines.get("vertebrae_L3_midline", False))
         # T4 and at least T8 need to be in the image for thoracic to be measured
-        thoracic = bool(vert_midlines.get("vertebrae_T8_midline", False) and vert_midlines.get("vertebrae_T4_midline", False))
+        thoracic = bool(
+            vert_midlines.get("vertebrae_T8_midline", False) and vert_midlines.get("vertebrae_T4_midline", False)
+        )
         # If at least the T12 and T9 are in the image, then we can measure the descending separate from the ascending
-        descending = bool(vert_midlines.get("vertebrae_T12_midline", False) and vert_midlines.get("vertebrae_T9_midline", False))
+        descending = bool(
+            vert_midlines.get("vertebrae_T12_midline", False) and vert_midlines.get("vertebrae_T9_midline", False)
+        )
         region_existence = {
             "abdominal": {
-                'exists': abdominal, 
+                "exists": abdominal,
             },
             "thoracic": {
-                'exists': thoracic, 
+                "exists": thoracic,
             },
             "descending": {
-                'exists': descending, 
-            }
+                "exists": descending,
+            },
         }
         self.region_existence = region_existence
-        if not any([region_existence[region]['exists'] for region in region_existence]):
+        if not any([region_existence[region]["exists"] for region in region_existence]):
             raise SegNotFoundError(f"No aortic regions found in {self.path}")
         return self
 
@@ -97,10 +101,10 @@ class Aorta(Segmentation):
 
     def _get_region_endpoints(self) -> None:
         for region_name, region in self.region_existence.items():
-            if region['exists']:
+            if region["exists"]:
                 endpoints = self._find_aortic_region_endpoints(region_name, self.vert_midlines)
-                self.region_existence[region_name]['endpoints'] = endpoints
-    
+                self.region_existence[region_name]["endpoints"] = endpoints
+
     @staticmethod
     def _find_aortic_region_endpoints(region: str, vert_midlines: dict) -> tuple[int, int]:
         possible_locs = Aorta.vertebral_regions_map[region]
@@ -127,31 +131,26 @@ class Aorta(Segmentation):
             self.setup_stats()
             self._measure_aorta()
             return self.aorta_stats
-        except ArchNotFoundError as e:
+        except ArchNotFoundError:
             logger.error(f"Could not define aortic arch in {self.path}")
             return {}
 
     def setup_stats(self):
-        'Set up the aorta centerline and cprs for statistics'
-        (
-            self
-            ._create_centerline()
-            ._create_cpr()
-            ._split_main_regions()
-        )
-        if self.region_existence['thoracic']['exists']:
+        "Set up the aorta centerline and cprs for statistics"
+        (self._create_centerline()._create_cpr()._split_main_regions())
+        if self.region_existence["thoracic"]["exists"]:
             self._split_thoracic_regions()
         else:
             self.thoracic_regions = {}
 
     def _create_centerline(self):
-        'Create the centerline for the aorta'
+        "Create the centerline for the aorta"
         self.centerline = Centerline(self.anisotropic_spacing_mm)
-        abdominal = self.region_existence["abdominal"]['exists']
-        thoracic = self.region_existence["thoracic"]['exists']
-        descending = self.region_existence["descending"]['exists']
+        abdominal = self.region_existence["abdominal"]["exists"]
+        thoracic = self.region_existence["thoracic"]["exists"]
+        descending = self.region_existence["descending"]["exists"]
         max_points = 0
-        window_length = 10 # mm distance for smoothing
+        window_length = 10  # mm distance for smoothing
         if abdominal:
             max_points += 300
         # only use either all thoracic or descending
@@ -163,18 +162,18 @@ class Aorta(Segmentation):
         return self
 
     def _create_cpr(self):
-        'Create the CPR for the aorta'
+        "Create the CPR for the aorta"
         self.seg_cpr = StraightenedCPR(
-            self.segmentation_arr, 
-            self.centerline, 
+            self.segmentation_arr,
+            self.centerline,
             self.cross_section_size_mm,
             self.cross_section_resolution,
             sigma=2,
-            is_binary=True
+            is_binary=True,
         ).straighten()
         # self.original_cpr = StraightenedCPR(
-        #     self.original_ct_arr, 
-        #     self.centerline, 
+        #     self.original_ct_arr,
+        #     self.centerline,
         #     self.cross_section_size_mm,
         #     self.cross_section_resolution,
         #     sigma=2,
@@ -183,29 +182,28 @@ class Aorta(Segmentation):
         return self
 
     def _split_main_regions(self):
-        'Split the centerline and CPR into main aortic regions of abdominal, thoracic and descending'
-        regions = {}
+        "Split the centerline and CPR into main aortic regions of abdominal, thoracic and descending"
         # Split the centerline and cprs into the appropriate_regions
         for region in self.region_existence:
-            if self.region_existence[region]['exists']:
-                if region == 'descending' and self.region_existence['thoracic']['exists']:
+            if self.region_existence[region]["exists"]:
+                if region == "descending" and self.region_existence["thoracic"]["exists"]:
                     continue
-                start, end = self.region_existence[region]['endpoints']
-                self.region_existence[region]['indices'] = self._split_region(start, end)
+                start, end = self.region_existence[region]["endpoints"]
+                self.region_existence[region]["indices"] = self._split_region(start, end)
         return self
 
     def _split_region(self, start: int, end: int):
-        'Split the centerline and CPR into a specific region'
+        "Split the centerline and CPR into a specific region"
         valid_indices = []
         for i, point in enumerate(self.centerline.centerline):
             if point[0] >= start and point[0] <= end:
                 valid_indices.append(i)
         return valid_indices
-    
+
     def _split_thoracic_regions(self):
         "Split the thoracic aorta centerline and CPRs into ascending, arch, and descending"
         thoracic_regions = {}
-        thoracic_indices = self.region_existence['thoracic']['indices']
+        thoracic_indices = self.region_existence["thoracic"]["indices"]
         thoracic_cpr = self.seg_cpr.cpr_arr[thoracic_indices]
         thoracic_centerline = self.centerline.centerline[thoracic_indices]
         thoracic_cumulative_lengths = self.centerline.cumulative_lengths[thoracic_indices]
@@ -264,15 +262,15 @@ class Aorta(Segmentation):
             if length > self.root_length_mm:
                 asc_start = i
                 break
-        thoracic_regions['asc_w_root'] = thoracic_indices[:arch_start]
-        thoracic_regions['asc_aorta'] = thoracic_indices[asc_start:arch_start]
-        thoracic_regions['aortic_arch'] = thoracic_indices[arch_start:arch_end]
-        thoracic_regions['desc_aorta'] = thoracic_indices[arch_end:]
+        thoracic_regions["asc_w_root"] = thoracic_indices[:arch_start]
+        thoracic_regions["asc_aorta"] = thoracic_indices[asc_start:arch_start]
+        thoracic_regions["aortic_arch"] = thoracic_indices[arch_start:arch_end]
+        thoracic_regions["desc_aorta"] = thoracic_indices[arch_end:]
         self.thoracic_regions = thoracic_regions
         return self
-        
+
     def _measure_aorta(self) -> dict[str, float]:
-        """Measure the statistics for each region of the aorta. 
+        """Measure the statistics for each region of the aorta.
         These include maximum diameter, maximum area, length, calcification and periaortic fat.
         Returns:
         --------
@@ -281,58 +279,57 @@ class Aorta(Segmentation):
         """
         aorta_stats = {}
         # Get the total aortic stats first
-        total_stats = self._measure_region('aorta', [i for i in range(len(self.centerline.centerline))])
+        total_stats = self._measure_region("aorta", [i for i in range(len(self.centerline.centerline))])
         aorta_stats.update(total_stats)
         if self.thoracic_regions:
             for region in self.thoracic_regions:
-                if region == 'asc_w_root':
+                if region == "asc_w_root":
                     continue
                 indices = self.thoracic_regions[region]
                 aorta_stats.update(self._measure_region(region, indices))
-        elif self.region_existence['descending']['exists']:
-            aorta_stats.update(self._measure_region('', self.region_existence['descending']['indices']))
-        
-        if self.region_existence['abdominal']['exists']:
-            aorta_stats.update(self._measure_region('abd_aorta', self.region_existence['abdominal']['indices']))
+        elif self.region_existence["descending"]["exists"]:
+            aorta_stats.update(self._measure_region("", self.region_existence["descending"]["indices"]))
+
+        if self.region_existence["abdominal"]["exists"]:
+            aorta_stats.update(self._measure_region("abd_aorta", self.region_existence["abdominal"]["indices"]))
         # Set the aorta stats
         self.aorta_stats = aorta_stats
         return self
 
     def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
-        'Measure the statistics for a specific region of the aorta'
+        "Measure the statistics for a specific region of the aorta"
         region_stats = {}
         try:
             region_centerline = self.centerline.centerline[indices]
             region_cumulative_lengths = self.centerline.cumulative_lengths[indices]
             region_cumulative_lengths = region_cumulative_lengths - region_cumulative_lengths[0]
             region_cpr = (self.seg_cpr.cpr_arr[indices] == 1).astype(np.uint8)
-            if hasattr(self, 'original_cpr'):
+            if hasattr(self, "original_cpr"):
                 region_original_cpr = self.original_cpr.cpr_arr[indices]
             # Region Length
             region_length = round(region_cumulative_lengths[-1], 0)
-            region_stats[f'{region}_length_mm'] = region_length
+            region_stats[f"{region}_length_mm"] = region_length
             # Region tortuosity
             region_tortuosity = calculate_tortuosity(region_centerline)
-            region_stats.update({f'{region}_{k}': v for k, v in region_tortuosity.items()})
+            region_stats.update({f"{region}_{k}": v for k, v in region_tortuosity.items()})
             # Diameters and areas
-            if region == 'aorta':
+            if region == "aorta":
                 return region_stats
-            
+
             diameters, max_idx = self._measure_diameters(region_cpr)
             if max_idx is not None:
                 max_distance = round(region_cumulative_lengths[max_idx], 0)
                 rel_distance = round((max_distance / region_length) * 100, 1)
-                diameters['max_diam_from_start_mm'] = max_distance
-                diameters['max_diam_rel_distance'] = rel_distance
-            region_stats.update({f'{region}_{k}': v for k, v in diameters.items()})
-        except IndexError as e:
+                diameters["max_diam_from_start_mm"] = max_distance
+                diameters["max_diam_rel_distance"] = rel_distance
+            region_stats.update({f"{region}_{k}": v for k, v in diameters.items()})
+        except IndexError:
             logger.error(f"Index Error measuring {region} region in {self.path}")
         finally:
             return region_stats
-        
-    
+
     def _measure_diameters(self, cpr: np.ndarray) -> tuple[dict[str, float], int]:
-        '''Measure the maximum, proximal, mid, and distal diameters of the aortic region
+        """Measure the maximum, proximal, mid, and distal diameters of the aortic region
         Parameters
         ----------
         cpr: np.ndarray
@@ -343,17 +340,23 @@ class Aorta(Segmentation):
             The maximum, proximal, mid, and distal diameters of the aortic region
         int
             the index of the maximum diameter of the CPR
-        '''
-        out_keys = ['max_diam']
+        """
+        out_keys = ["max_diam"]
         mid_idx = len(cpr) // 2
         # measure the proximal aortic diameter
-        proximal = StraightenedCPR.measure_cross_sectional_diameter(cpr[0], self.cross_section_spacing_mm, diff_threshold=5)
+        proximal = StraightenedCPR.measure_cross_sectional_diameter(
+            cpr[0], self.cross_section_spacing_mm, diff_threshold=5
+        )
         proximal = {k.replace("max_", "prox_"): proximal[k] for k in out_keys}
         # measure the mid aortic diameter
-        mid = StraightenedCPR.measure_cross_sectional_diameter(cpr[mid_idx], self.cross_section_spacing_mm, diff_threshold=5)
+        mid = StraightenedCPR.measure_cross_sectional_diameter(
+            cpr[mid_idx], self.cross_section_spacing_mm, diff_threshold=5
+        )
         mid = {k.replace("max_", "mid_"): mid[k] for k in out_keys}
         # measure the distal aortic diameter
-        distal = StraightenedCPR.measure_cross_sectional_diameter(cpr[-1], self.cross_section_spacing_mm, diff_threshold=5)
+        distal = StraightenedCPR.measure_cross_sectional_diameter(
+            cpr[-1], self.cross_section_spacing_mm, diff_threshold=5
+        )
         distal = {k.replace("max_", "dist_"): distal[k] for k in out_keys}
         # measure the maximum aortic diameter
         max_diams = []
@@ -361,20 +364,24 @@ class Aorta(Segmentation):
         major_diams = []
         minor_diams = []
         for cross_section in cpr:
-            diam = StraightenedCPR.measure_cross_sectional_diameter(cross_section, self.cross_section_spacing_mm, diff_threshold=5)
-            max_areas.append(diam.get('max_area', np.nan))
-            max_diams.append(diam.get('max_diam', np.nan))
-            major_diams.append(diam.get('major_diam', np.nan))
-            minor_diams.append(diam.get('minor_diam', np.nan))
+            diam = StraightenedCPR.measure_cross_sectional_diameter(
+                cross_section, self.cross_section_spacing_mm, diff_threshold=5
+            )
+            max_areas.append(diam.get("max_area", np.nan))
+            max_diams.append(diam.get("max_diam", np.nan))
+            major_diams.append(diam.get("major_diam", np.nan))
+            minor_diams.append(diam.get("minor_diam", np.nan))
         if max_diams:
             largest_idx = np.nanargmax(max_diams)
             max_ = {
-                'max_area': max_areas[largest_idx],
-                'avg_diam': max_diams[largest_idx],
-                'major_diam': major_diams[largest_idx],
-                'minor_diam': minor_diams[largest_idx]
+                "max_area": max_areas[largest_idx],
+                "avg_diam": max_diams[largest_idx],
+                "major_diam": major_diams[largest_idx],
+                "minor_diam": minor_diams[largest_idx],
             }
         else:
             max_ = {}
             largest_idx = None
         return {**max_, **proximal, **mid, **distal}, largest_idx
+
+    # TODO - add calcification and periaortic fat measurements

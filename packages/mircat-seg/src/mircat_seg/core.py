@@ -24,7 +24,6 @@ from monai.inferers import SlidingWindowInfererAdapt
 from monai.networks.nets import UNet
 from monai import transforms as mt
 
-from mircat_stats.configs.logging import get_project_root
 from mircat_stats.configs.models import torch_model_configs
 # from mircat_stats.configs import set_num_threads
 

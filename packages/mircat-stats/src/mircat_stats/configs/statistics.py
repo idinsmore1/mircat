@@ -1,4 +1,17 @@
-aorta_names = ["length_mm", "tortuosity_index", "soam", "max_area", "prox_diam", "mid_diam", "dist_diam", "avg_diam", "major_diam", "minor_diam", "max_diam_from_start_mm", "max_diam_rel_distance"]
+aorta_names = [
+    "length_mm",
+    "tortuosity_index",
+    "soam",
+    "max_area",
+    "prox_diam",
+    "mid_diam",
+    "dist_diam",
+    "avg_diam",
+    "major_diam",
+    "minor_diam",
+    "max_diam_from_start_mm",
+    "max_diam_rel_distance",
+]
 stats_output_keys = [
     "nifti_path",
     "mrn",

@@ -14,6 +14,7 @@ class SegNotFoundError(ValueError):
 
     pass
 
+
 class ArchNotFoundError(ValueError):
     """
     Raised when the aortic arch can not be defined

@@ -1,5 +1,5 @@
 import argparse
-from threadpoolctl import threadpool_limits, ThreadpoolController
+from threadpoolctl import threadpool_limits
 from pathlib import Path
 from loguru import logger
 from mircat_seg import segment_niftis
