@@ -123,9 +123,13 @@ class Aorta(Segmentation):
             The statistics for the aorta
         """
         # Create the aorta centerline
-        self.setup_stats()
-        self._measure_aorta()
-        return self.aorta_stats
+        try:
+            self.setup_stats()
+            self._measure_aorta()
+            return self.aorta_stats
+        except ArchNotFoundError as e:
+            logger.error(f"Could not define aortic arch in {self.path}")
+            return {}
 
     def setup_stats(self):
         'Set up the aorta centerline and cprs for statistics'
@@ -297,30 +301,35 @@ class Aorta(Segmentation):
     def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
         'Measure the statistics for a specific region of the aorta'
         region_stats = {}
-        region_centerline = self.centerline.centerline[indices]
-        region_cumulative_lengths = self.centerline.cumulative_lengths[indices]
-        region_cumulative_lengths = region_cumulative_lengths - region_cumulative_lengths[0]
-        region_cpr = (self.seg_cpr.cpr_arr[indices] == 1).astype(np.uint8)
-        if hasattr(self, 'original_cpr'):
-            region_original_cpr = self.original_cpr.cpr_arr[indices]
-        # Region Length
-        region_length = round(region_cumulative_lengths[-1], 0)
-        region_stats[f'{region}_length_mm'] = region_length
-        # Region tortuosity
-        region_tortuosity = calculate_tortuosity(region_centerline)
-        region_stats.update({f'{region}_{k}': v for k, v in region_tortuosity.items()})
-        # Diameters and areas
-        if region == 'aorta':
+        try:
+            region_centerline = self.centerline.centerline[indices]
+            region_cumulative_lengths = self.centerline.cumulative_lengths[indices]
+            region_cumulative_lengths = region_cumulative_lengths - region_cumulative_lengths[0]
+            region_cpr = (self.seg_cpr.cpr_arr[indices] == 1).astype(np.uint8)
+            if hasattr(self, 'original_cpr'):
+                region_original_cpr = self.original_cpr.cpr_arr[indices]
+            # Region Length
+            region_length = round(region_cumulative_lengths[-1], 0)
+            region_stats[f'{region}_length_mm'] = region_length
+            # Region tortuosity
+            region_tortuosity = calculate_tortuosity(region_centerline)
+            region_stats.update({f'{region}_{k}': v for k, v in region_tortuosity.items()})
+            # Diameters and areas
+            if region == 'aorta':
+                return region_stats
+            
+            diameters, max_idx = self._measure_diameters(region_cpr)
+            if max_idx is not None:
+                max_distance = round(region_cumulative_lengths[max_idx], 0)
+                rel_distance = round((max_distance / region_length) * 100, 1)
+                diameters['max_diam_from_start_mm'] = max_distance
+                diameters['max_diam_rel_distance'] = rel_distance
+            region_stats.update({f'{region}_{k}': v for k, v in diameters.items()})
+        except IndexError as e:
+            logger.error(f"Index Error measuring {region} region in {self.path}")
+        finally:
             return region_stats
         
-        diameters, max_idx = self._measure_diameters(region_cpr)
-        if max_idx is not None:
-            max_distance = round(region_cumulative_lengths[max_idx], 0)
-            rel_distance = round((max_distance / region_length) * 100, 1)
-            diameters['max_diam_from_start_mm'] = max_distance
-            diameters['max_diam_rel_distance'] = rel_distance
-        region_stats.update({f'{region}_{k}': v for k, v in diameters.items()})
-        return region_stats
     
     def _measure_diameters(self, cpr: np.ndarray) -> tuple[dict[str, float], int]:
         '''Measure the maximum, proximal, mid, and distal diameters of the aortic region
