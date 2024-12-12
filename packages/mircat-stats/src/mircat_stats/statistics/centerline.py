@@ -174,12 +174,14 @@ class Centerline:
                 B-spline smoothing factor (0-1). default 0.5
             gaussian_sigma: float
                 The sigma value for the gaussian smoothing. Default = 1.0
+            window_length: int
+                The window length for the Savitzky-Golay filter in physical units (i.e. mm if image is in mm). Default = 15
         """
         min_points = kwargs.get("min_points", 25)
         max_points = kwargs.get("max_points", 200)
         smoothing_factor = kwargs.get("smoothing_factor", 0.5)
         gaussian_sigma = kwargs.get("gaussian_sigma", 1.0)
-        window_length = kwargs.get("window_length", 10)
+        window_length = kwargs.get("window_length", 15)
         # Order the skeleton
         self._order_skeleton()
         # Resample the centerline with a B-spline
@@ -370,7 +372,7 @@ class Centerline:
         self.binormal_vectors = v1s, v2s
 
 
-def calculate_tortuosity(centerline_arr: np.ndarray) -> dict[str, float]:
+def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], tuple]:
     """Calculate the tortuosity of a centerline
     Parameters:
     -----------
@@ -378,10 +380,12 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> dict[str, float]:
         The centerline to calculate the tortuosity for
     Returns:
     --------
-    dict[str, float]
-        The following metrics of tortuosity of the centerline
-        tortuosity_index: total length / euclidean distance
-        sum_of_angles: sum of angles between tangent vectors divided by centerline length
+    tuple[dict[str, float], np.ndarray]
+        A tuple containing:
+        - A dictionary with the following metrics of tortuosity of the centerline:
+            tortuosity_index: total length / euclidean distance
+            sum_of_angles: sum of angles between tangent vectors divided by centerline length
+        - An array of curvature angles
 
     SOAM and TI Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC2430603/#S6
     """
@@ -394,17 +398,29 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> dict[str, float]:
     # Calculate the sum of angles
     cs = CubicSpline(cumulative_lengths, centerline_arr, bc_type="natural")
     tangents = cs(cumulative_lengths, 1)
-    total_angles = _get_total_angles(tangents)
-    soam = np.sum(total_angles) / total_length
-    return {"tort_idx": round(tortuosity_index, 1), "soam": round(soam, 1)}
-
+    angle_measures = _get_total_angles(tangents)
+    total_angles = angle_measures[0]
+    soam = np.sum(total_angles) / (total_length / 10)  # Sum of Angles should be in radians/cm
+    return {"tort_idx": round(tortuosity_index, 1), "soam": round(soam, 1)}, angle_measures
 
 def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
     """
-    Calculate the array of total curvature angles
+    Calculate the array of total curvature angles.
+
+    Parameters:
+    -----------
+    tangents : np.ndarray
+        The tangent vectors of the centerline.
+
+    Returns:
+    --------
+    np.ndarray
+        The array of total curvature angles.
     """
     n = len(tangents)
     total_angles = np.zeros(n - 3)
+    in_plane_angles = np.zeros(n - 3)
+    torsional_angles = np.zeros(n - 3)
     norm_tangents = tangents / np.linalg.norm(tangents, axis=1)[:, None]
     # You need to start and 1 and go to n-2 as k+2 is the last index
     for k in range(1, n - 2):
@@ -421,5 +437,7 @@ def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
         tp = np.arccos(np.dot(v1, v2))
         # calculate the total angle
         cp = np.sqrt(ip**2 + tp**2)
+        in_plane_angles[k - 1] = ip
+        torsional_angles[k - 1] = tp
         total_angles[k - 1] = cp
-    return total_angles
+    return total_angles, in_plane_angles, torsional_angles

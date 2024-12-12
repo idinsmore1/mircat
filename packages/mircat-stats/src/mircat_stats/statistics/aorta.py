@@ -1,5 +1,6 @@
 import numpy as np
 import SimpleITK as sitk
+import polars as pl
 
 from operator import itemgetter
 from loguru import logger
@@ -264,7 +265,7 @@ class Aorta(Segmentation):
             if length > self.root_length_mm:
                 asc_start = i
                 break
-        thoracic_regions["asc_w_root"] = thoracic_indices[:arch_start]
+        thoracic_regions["aortic_root"] = thoracic_indices[:asc_start]
         thoracic_regions["asc_aorta"] = thoracic_indices[asc_start:arch_start]
         thoracic_regions["aortic_arch"] = thoracic_indices[arch_start:arch_end]
         thoracic_regions["desc_aorta"] = thoracic_indices[arch_end:]
@@ -283,8 +284,6 @@ class Aorta(Segmentation):
         aorta_stats = self._measure_whole_aorta()
         if self.thoracic_regions:
             for region in self.thoracic_regions:
-                if region == "asc_w_root":
-                    continue
                 indices = self.thoracic_regions[region]
                 aorta_stats.update(self._measure_region(region, indices))
         elif self.region_existence["descending"]["exists"]:
@@ -311,8 +310,9 @@ class Aorta(Segmentation):
         aorta_stats['aorta_length_mm'] = round(cumulative_length, 0)
         # Calculate tortuosity
         centerline = self.centerline.centerline
-        tortuosity = calculate_tortuosity(centerline)
+        tortuosity, angle_measures = calculate_tortuosity(centerline)
         tortuosity = {f"aorta_{k}": v for k, v in tortuosity.items()}
+        self.angles_of_centerline = angle_measures
         aorta_stats.update(tortuosity)
         # Measure diameters for each slice of the cpr
         seg_cpr = self.seg_cpr.cpr_arr
@@ -326,9 +326,12 @@ class Aorta(Segmentation):
         # Create the periaortic fat array
         self._create_periaortic_arrays(aorta_diameters)
         # The cpr is always in (1, 1, 1) mm spacing, so the sum will be in mm^3
+        aorta_stats['aorta_periaortic_total_cm3'] = round((self.periaortic_mask_cpr.sum() + seg_cpr.sum()) / 1000, 1)
         aorta_stats['aorta_periaortic_ring_cm3'] = round(self.periaortic_mask_cpr.sum() / 1000, 1)
         aorta_stats['aorta_periaortic_fat_cm3'] = round(self.periaortic_fat_cpr.sum() / 1000, 1)
-        # Assign the stats to the aorta_stats attribute
+        fat_values = np.where(self.periaortic_fat_cpr == 1, self.original_cpr.cpr_arr, np.nan)
+        aorta_stats['aorta_periaortic_fat_mean_hu'] = round(np.nanmean(fat_values), 1)
+        aorta_stats['aorta_periaortic_fat_stddev_hu'] = round(np.nanstd(fat_values), 1)
         return aorta_stats
     
     def _create_periaortic_arrays(self, aortic_diameters: list[dict[str, float]]) -> np.ndarray:
@@ -377,7 +380,7 @@ class Aorta(Segmentation):
             region_stats[f"{region}_length_mm"] = region_length
             # Region tortuosity
             region_centerline = self.centerline.centerline[indices]
-            region_tortuosity = calculate_tortuosity(region_centerline)
+            region_tortuosity, _ = calculate_tortuosity(region_centerline)
             region_stats.update({f"{region}_{k}": v for k, v in region_tortuosity.items()})
             # Diameters and areas
             region_diameters = list(itemgetter(*indices)(self.aorta_diameters))
@@ -389,20 +392,26 @@ class Aorta(Segmentation):
                 diameters["max_diam_rel_dist"] = rel_distance  # relative distance from the start of the region
             region_stats.update({f"{region}_{k}": v for k, v in diameters.items()})
             # Periaortic fat
-            fat_measures = self._extract_region_fat(region, indices, region_stats)
+            fat_measures = self._extract_region_periaortic_fat(region, indices)
             region_stats.update(fat_measures)
         except IndexError:
             logger.error(f"Index Error measuring {region} region in {self.path}")
         finally:
             return region_stats
 
-    def _extract_region_fat(self, region, indices):
+    def _extract_region_periaortic_fat(self, region, indices):
         measures = {}
+        region_seg_cpr = self.seg_cpr.cpr_arr[indices] 
         region_ct_cpr = self.original_cpr.cpr_arr[indices]
         region_mask = self.periaortic_mask_cpr[indices]
         region_fat = self.periaortic_fat_cpr[indices]
+        measures[f'{region}_periaortic_total_cm3'] = round((region_mask.sum() + region_seg_cpr.sum()) / 1000, 1)
         measures[f"{region}_periaortic_ring_cm3"] = round(region_mask.sum() / 1000, 1)
         measures[f"{region}_periaortic_fat_cm3"] = round(region_fat.sum() / 1000, 1)
+        # Calculate the average intensity and standard deviation of the fat
+        fat_values = np.where(region_fat == 1, region_ct_cpr, np.nan)
+        measures[f'{region}_periaortic_fat_mean_hu'] = round(np.nanmean(fat_values), 1)
+        measures[f'{region}_periaortic_fat_stddev_hu'] = round(np.nanstd(fat_values), 1)
         return measures
 
     def _extract_region_diameters(self, region_diameters: list[str, dict]) -> tuple[dict[str, float], int]:
@@ -455,3 +464,54 @@ class Aorta(Segmentation):
             max_ = {}
             largest_idx = None
         return {**max_, **proximal, **mid, **distal}, largest_idx 
+    
+    #### Write the statistics to a csv file
+    def write_aorta_stats(self) -> None:
+        """Write the aorta statistics to a csv file"""
+        str_coordinates = []
+        index = []
+        for i, point in enumerate(self.centerline.centerline):
+            index.append(i)
+            str_coordinates.append(f"{point[0]:.1f},{point[1]:.1f},{point[2]:.1f}")
+        regions = [None for _ in  range(len(index))]
+        name_map = {'aortic_root': 'root', 'asc_aorta': 'ascending', 'aortic_arch': 'arch', 'desc_aorta': 'descending', 'abd_aorta': 'abdominal'}
+        if self.thoracic_regions:
+            for region, indices in self.thoracic_regions.items():
+                for idx in indices:
+                    regions[idx] = name_map.get(region)
+        elif self.region_existence["descending"]["exists"]:
+            for i in self.region_existence["descending"]["indices"]:
+                regions[i] = "descending"
+        if self.region_existence['abdominal']['exists']:
+            for i in self.region_existence['abdominal']['indices']:
+                regions[i] = 'abdominal'
+
+        diameters = [d['diam'] for d in self.aorta_diameters]
+        major_axes = [d['major_axis'] for d in self.aorta_diameters]
+        minor_axes = [d['minor_axis'] for d in self.aorta_diameters]
+        areas = [d['area'] for d in self.aorta_diameters]
+        flatnesses = [d['flatness'] for d in self.aorta_diameters]
+        roundnesses = [d['roundness'] for d in self.aorta_diameters]
+        total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
+        in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
+        torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
+        df = pl.DataFrame(
+            {
+                "index": index,
+                "region": regions,
+                "centerline_coord": str_coordinates,
+                "area": areas,
+                "diameter": diameters,
+                "major_axis": major_axes,
+                "minor_axis": minor_axes,
+                "flatness": flatnesses,
+                "roundness": roundnesses,
+                "total_angle": total_angles,
+                "in_plane_angle": in_plane_angles,
+                "torsional_angle": torsional_angles,
+            },
+            strict=False,
+            nan_to_null=True,
+        )
+        output_path = self.seg_folder / f'{self.nifti_name}_aorta.csv'
+        df.write_csv(output_path)

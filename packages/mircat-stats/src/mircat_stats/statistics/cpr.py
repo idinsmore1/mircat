@@ -1,4 +1,5 @@
 import numpy as np
+import SimpleITK as sitk
 
 from dataclasses import dataclass
 from scipy.interpolate import interpn
@@ -161,7 +162,7 @@ class StraightenedCPR:
         :return: a dictionary containing the average, major, and minor diameters as well as the cross section area.
         """
         regions = _get_regions(cross_section)
-        data = {"diam": np.nan, "major_axis": np.nan, "minor_axis": np.nan, "area": np.nan}
+        data = {"diam": np.nan, "major_axis": np.nan, "minor_axis": np.nan, "area": np.nan, "flatness": np.nan, "roundness": np.nan}
         if len(regions) == 0:
             return data
         region = regions[0]
@@ -171,16 +172,20 @@ class StraightenedCPR:
         major_diam = StraightenedCPR._endpoint_euclidean_distance(major_units)
         minor_diam = StraightenedCPR._endpoint_euclidean_distance(minor_units)
         if abs(major_diam - minor_diam) < diff_threshold:
-            max_diam = round((major_diam + minor_diam) / 2, 1)
+            diam = round((major_diam + minor_diam) / 2, 1)
         else:
-            max_diam = min(major_diam, minor_diam)
-        max_area = (cross_section == 1).sum() * np.prod(pixel_spacing)
+            diam = min(major_diam, minor_diam)
+        area = region.area * pixel_spacing[0] * pixel_spacing[1]
+        flatness = major_diam / minor_diam
+        roundness = (4 * np.pi * area) / (region.perimeter) ** 2
         data.update(
             {
-                "diam": max_diam,
+                "diam": diam,
                 "major_axis": major_diam,
                 "minor_axis": minor_diam,
-                "area": max_area,
+                "area": area,
+                "flatness": round(flatness, 2),
+                "roundness": round(roundness, 2)
             }
         )
         return data

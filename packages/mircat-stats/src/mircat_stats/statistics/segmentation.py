@@ -59,6 +59,7 @@ class Segmentation:
         self.original_ct = nifti.original_ct
         self.vert_midlines = nifti.vert_midlines.copy()
         self.seg_folder = nifti.seg_folder
+        self.nifti_name = nifti.nifti_name
         self.seg_names = seg_names
         self._find_seg_model()
         self._filter_to_segmentation(nifti)
