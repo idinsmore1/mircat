@@ -396,7 +396,7 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> dict[str, float]:
     tangents = cs(cumulative_lengths, 1)
     total_angles = _get_total_angles(tangents)
     soam = np.sum(total_angles) / total_length
-    return {"tortuosity_index": round(tortuosity_index, 1), "soam": round(soam, 1)}
+    return {"tort_idx": round(tortuosity_index, 1), "soam": round(soam, 1)}
 
 
 def _get_total_angles(tangents: np.ndarray) -> np.ndarray:

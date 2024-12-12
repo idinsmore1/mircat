@@ -1,7 +1,9 @@
 import numpy as np
 import SimpleITK as sitk
 
+from operator import itemgetter
 from loguru import logger
+from skimage import draw
 from mircat_stats.configs.logging import timer
 from mircat_stats.statistics.centerline import Centerline, calculate_tortuosity
 from mircat_stats.statistics.cpr import StraightenedCPR
@@ -129,7 +131,7 @@ class Aorta(Segmentation):
         # Create the aorta centerline
         try:
             self.setup_stats()
-            self._measure_aorta()
+            self.calc_stats()
             return self.aorta_stats
         except ArchNotFoundError:
             logger.error(f"Could not define aortic arch in {self.path}")
@@ -137,7 +139,7 @@ class Aorta(Segmentation):
 
     def setup_stats(self):
         "Set up the aorta centerline and cprs for statistics"
-        (self._create_centerline()._create_cpr()._split_main_regions())
+        self._create_centerline()._create_cpr()._split_main_regions()
         if self.region_existence["thoracic"]["exists"]:
             self._split_thoracic_regions()
         else:
@@ -171,14 +173,14 @@ class Aorta(Segmentation):
             sigma=2,
             is_binary=True,
         ).straighten()
-        # self.original_cpr = StraightenedCPR(
-        #     self.original_ct_arr,
-        #     self.centerline,
-        #     self.cross_section_size_mm,
-        #     self.cross_section_resolution,
-        #     sigma=2,
-        #     is_binary=False
-        # ).straighten()
+        self.original_cpr = StraightenedCPR(
+            self.original_ct_arr,
+            self.centerline,
+            self.cross_section_size_mm,
+            self.cross_section_resolution,
+            sigma=2,
+            is_binary=False
+        ).straighten()
         return self
 
     def _split_main_regions(self):
@@ -269,18 +271,16 @@ class Aorta(Segmentation):
         self.thoracic_regions = thoracic_regions
         return self
 
-    def _measure_aorta(self) -> dict[str, float]:
-        """Measure the statistics for each region of the aorta.
+    def calc_stats(self) -> dict[str, float]:
+        """Calculate the statistics for each region of the aorta.
         These include maximum diameter, maximum area, length, calcification and periaortic fat.
         Returns:
         --------
         dict[str, float]
             The statistics for the aorta regions
         """
-        aorta_stats = {}
         # Get the total aortic stats first
-        total_stats = self._measure_region("aorta", [i for i in range(len(self.centerline.centerline))])
-        aorta_stats.update(total_stats)
+        aorta_stats = self._measure_whole_aorta()
         if self.thoracic_regions:
             for region in self.thoracic_regions:
                 if region == "asc_w_root":
@@ -289,46 +289,123 @@ class Aorta(Segmentation):
                 aorta_stats.update(self._measure_region(region, indices))
         elif self.region_existence["descending"]["exists"]:
             aorta_stats.update(self._measure_region("", self.region_existence["descending"]["indices"]))
-
         if self.region_existence["abdominal"]["exists"]:
             aorta_stats.update(self._measure_region("abd_aorta", self.region_existence["abdominal"]["indices"]))
         # Set the aorta stats
         self.aorta_stats = aorta_stats
         return self
+    
+    def _measure_whole_aorta(self) -> dict[str, float]:
+        """Measure the statistics for the whole aorta.
+        Sets the following attributes after measurement:
+            aorta_diameters: list[dict[str, float]] -> a list of measurement dictionaries for each cross section
+            aorta_fat: dict[str, float] -> the output dictionary for the fat measurements
+        Returns:
+        --------
+        dict[str, float]
+            The statistics for the whole aorta
+        """
+        aorta_stats = {}
+        # Set the total aorta length
+        cumulative_length = self.centerline.cumulative_lengths[-1]
+        aorta_stats['aorta_length_mm'] = round(cumulative_length, 0)
+        # Calculate tortuosity
+        centerline = self.centerline.centerline
+        tortuosity = calculate_tortuosity(centerline)
+        tortuosity = {f"aorta_{k}": v for k, v in tortuosity.items()}
+        aorta_stats.update(tortuosity)
+        # Measure diameters for each slice of the cpr
+        seg_cpr = self.seg_cpr.cpr_arr
+        aorta_diameters = []
+        for cross_section in seg_cpr:
+            diam = StraightenedCPR.measure_cross_section(
+                cross_section, self.cross_section_spacing_mm, diff_threshold=5
+            )
+            aorta_diameters.append(diam)
+        self.aorta_diameters = aorta_diameters
+        # Create the periaortic fat array
+        self._create_periaortic_arrays(aorta_diameters)
+        # The cpr is always in (1, 1, 1) mm spacing, so the sum will be in mm^3
+        aorta_stats['aorta_periaortic_ring_cm3'] = round(self.periaortic_mask_cpr.sum() / 1000, 1)
+        aorta_stats['aorta_periaortic_fat_cm3'] = round(self.periaortic_fat_cpr.sum() / 1000, 1)
+        # Assign the stats to the aorta_stats attribute
+        return aorta_stats
+    
+    def _create_periaortic_arrays(self, aortic_diameters: list[dict[str, float]]) -> np.ndarray:
+        """Create the periaortic fat array for the aorta
+        Parameters
+        ----------
+        aortic_diameters: list[dict[str, float]]
+            The list of aortic diameters for each cross section
+        Returns
+        -------
+        np.ndarray
+            The array of masked periaortic fat
+        """
+        diams = [d["diam"] for d in aortic_diameters]
+        seg_cpr = self.seg_cpr.cpr_arr
+        ct_cpr = np.clip(self.original_cpr.cpr_arr, -250, 250)  # clip to HU range to remove artifacts
+        periaortic_fat = np.zeros_like(seg_cpr, dtype=np.uint8)
+        periaortic_mask = np.zeros_like(seg_cpr, dtype=np.uint8)
+        assert len(diams) == len(seg_cpr), ValueError("Number of diameters and CPR slices must match")
+        for i, (diam, cpr_slice, ct_slice) in enumerate(zip(diams, seg_cpr, ct_cpr)):
+            if np.isnan(diam) or diam == 0:
+                continue
+            radius = (diam / 2) + 10 # add 10mm to the radius
+            # Draw a filled circle around the center of the aorta
+            center_y, center_x = _get_regions(cpr_slice)[0].centroid
+            ring_mask = np.zeros_like(cpr_slice, dtype=np.uint8)
+            rr, cc = draw.disk((center_y, center_x), radius, shape=cpr_slice.shape)
+            ring_mask[rr, cc] = 1
+            # Remove the aorta from the mask
+            ring_mask[cpr_slice == 1] = 0
+            periaortic_mask[i] = ring_mask
+            # Remove any non-fat regions inside the ring
+            fat_mask = (ct_slice >= -190) & (ct_slice <= -30) * ring_mask
+            periaortic_fat[i] = fat_mask
+        self.periaortic_mask_cpr = periaortic_mask
+        self.periaortic_fat_cpr = periaortic_fat
 
     def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
         "Measure the statistics for a specific region of the aorta"
         region_stats = {}
         try:
-            region_centerline = self.centerline.centerline[indices]
+            # Region length
             region_cumulative_lengths = self.centerline.cumulative_lengths[indices]
             region_cumulative_lengths = region_cumulative_lengths - region_cumulative_lengths[0]
-            region_cpr = (self.seg_cpr.cpr_arr[indices] == 1).astype(np.uint8)
-            if hasattr(self, "original_cpr"):
-                region_original_cpr = self.original_cpr.cpr_arr[indices]
-            # Region Length
             region_length = round(region_cumulative_lengths[-1], 0)
             region_stats[f"{region}_length_mm"] = region_length
             # Region tortuosity
+            region_centerline = self.centerline.centerline[indices]
             region_tortuosity = calculate_tortuosity(region_centerline)
             region_stats.update({f"{region}_{k}": v for k, v in region_tortuosity.items()})
             # Diameters and areas
-            if region == "aorta":
-                return region_stats
-
-            diameters, max_idx = self._measure_diameters(region_cpr)
+            region_diameters = list(itemgetter(*indices)(self.aorta_diameters))
+            diameters, max_idx = self._extract_region_diameters(region_diameters)
             if max_idx is not None:
                 max_distance = round(region_cumulative_lengths[max_idx], 0)
                 rel_distance = round((max_distance / region_length) * 100, 1)
-                diameters["max_diam_from_start_mm"] = max_distance
-                diameters["max_diam_rel_distance"] = rel_distance
+                diameters["max_diam_dist_mm"] = max_distance  # distance from the start of the region
+                diameters["max_diam_rel_dist"] = rel_distance  # relative distance from the start of the region
             region_stats.update({f"{region}_{k}": v for k, v in diameters.items()})
+            # Periaortic fat
+            fat_measures = self._extract_region_fat(region, indices, region_stats)
+            region_stats.update(fat_measures)
         except IndexError:
             logger.error(f"Index Error measuring {region} region in {self.path}")
         finally:
             return region_stats
 
-    def _measure_diameters(self, cpr: np.ndarray) -> tuple[dict[str, float], int]:
+    def _extract_region_fat(self, region, indices):
+        measures = {}
+        region_ct_cpr = self.original_cpr.cpr_arr[indices]
+        region_mask = self.periaortic_mask_cpr[indices]
+        region_fat = self.periaortic_fat_cpr[indices]
+        measures[f"{region}_periaortic_ring_cm3"] = round(region_mask.sum() / 1000, 1)
+        measures[f"{region}_periaortic_fat_cm3"] = round(region_fat.sum() / 1000, 1)
+        return measures
+
+    def _extract_region_diameters(self, region_diameters: list[str, dict]) -> tuple[dict[str, float], int]:
         """Measure the maximum, proximal, mid, and distal diameters of the aortic region
         Parameters
         ----------
@@ -341,47 +418,40 @@ class Aorta(Segmentation):
         int
             the index of the maximum diameter of the CPR
         """
-        out_keys = ["max_diam"]
-        mid_idx = len(cpr) // 2
-        # measure the proximal aortic diameter
-        proximal = StraightenedCPR.measure_cross_sectional_diameter(
-            cpr[0], self.cross_section_spacing_mm, diff_threshold=5
-        )
-        proximal = {k.replace("max_", "prox_"): proximal[k] for k in out_keys}
-        # measure the mid aortic diameter
-        mid = StraightenedCPR.measure_cross_sectional_diameter(
-            cpr[mid_idx], self.cross_section_spacing_mm, diff_threshold=5
-        )
-        mid = {k.replace("max_", "mid_"): mid[k] for k in out_keys}
-        # measure the distal aortic diameter
-        distal = StraightenedCPR.measure_cross_sectional_diameter(
-            cpr[-1], self.cross_section_spacing_mm, diff_threshold=5
-        )
-        distal = {k.replace("max_", "dist_"): distal[k] for k in out_keys}
+        # extract the proximal region diameter
+        for i, diam in enumerate(region_diameters):
+            if not np.isnan(diam["diam"]):
+                prox_idx = i
+                break
+        proximal = {f'prox_{k}': v for k, v in region_diameters[prox_idx].items()}
+        # extract the mid region diameter
+        mid_idx = len(region_diameters) // 2
+        mid = {f'mid_{k}': v for k, v in region_diameters[mid_idx].items()}
+        # extract the distal region diameter
+        for i, diam in enumerate(region_diameters[::-1]):
+            if not np.isnan(diam["diam"]):
+                dist_idx = i
+                break
+        distal = {f'dist_{k}': v for k, v in region_diameters[::-1][dist_idx].items()}
         # measure the maximum aortic diameter
-        max_diams = []
-        max_areas = []
-        major_diams = []
-        minor_diams = []
-        for cross_section in cpr:
-            diam = StraightenedCPR.measure_cross_sectional_diameter(
-                cross_section, self.cross_section_spacing_mm, diff_threshold=5
-            )
-            max_areas.append(diam.get("max_area", np.nan))
-            max_diams.append(diam.get("max_diam", np.nan))
-            major_diams.append(diam.get("major_diam", np.nan))
-            minor_diams.append(diam.get("minor_diam", np.nan))
-        if max_diams:
-            largest_idx = np.nanargmax(max_diams)
+        diams = []
+        areas = []
+        major_axes = []
+        minor_axes = []
+        for diam in region_diameters:
+            diams.append(diam.get("diam", np.nan))
+            major_axes.append(diam.get("major_axis", np.nan))
+            minor_axes.append(diam.get("minor_axis", np.nan))
+            areas.append(diam.get("area", np.nan))
+        if diams:
+            largest_idx = np.nanargmax(diams)
             max_ = {
-                "max_area": max_areas[largest_idx],
-                "avg_diam": max_diams[largest_idx],
-                "major_diam": major_diams[largest_idx],
-                "minor_diam": minor_diams[largest_idx],
+                "max_diam": diams[largest_idx],
+                "max_major_axis": major_axes[largest_idx],
+                "max_minor_axis": minor_axes[largest_idx],
+                "max_area": areas[largest_idx],
             }
         else:
             max_ = {}
             largest_idx = None
-        return {**max_, **proximal, **mid, **distal}, largest_idx
-
-    # TODO - add calcification and periaortic fat measurements
+        return {**max_, **proximal, **mid, **distal}, largest_idx 

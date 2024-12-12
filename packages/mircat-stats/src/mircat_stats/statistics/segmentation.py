@@ -167,6 +167,6 @@ class Segmentation:
         # Extract from segmentation
         cropped_seg = extract.Execute(self.segmentation)
         cropped_img = extract.Execute(self.original_ct)
-        self.cropped_segmentation = cropped_seg
-        self.cropped_ct = cropped_img
+        self.cropped_seg = sitk.GetArrayFromImage(cropped_seg)
+        self.cropped_ct = sitk.GetArrayFromImage(cropped_img)
         return self

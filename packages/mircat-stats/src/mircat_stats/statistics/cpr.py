@@ -71,7 +71,8 @@ class StraightenedCPR:
         x_grid, y_grid = np.meshgrid(x_lin, y_lin)
         # Map the grid points to the 3D array indices
         slice_points = center_point + x_grid[..., np.newaxis] * v1 + y_grid[..., np.newaxis] * v2
-        if self.is_binary:
+        # if self.is_binary:
+        if True:  # For testing
             slice_points = np.rint(slice_points).astype(int)
             # Initialize an empty slice with zeros (padding)
             slice_2d = np.zeros((int(height / resolution), int(width / resolution)), dtype=arr.dtype)
@@ -149,18 +150,18 @@ class StraightenedCPR:
         return center_label
 
     @staticmethod
-    def measure_cross_sectional_diameter(
+    def measure_cross_section(
         cross_section: np.ndarray, pixel_spacing: tuple, diff_threshold: int
     ) -> dict[str, float]:
-        """Measure the cross-sectional diameter from a straightened cpr slice
+        """Measure the cross-sectional diameter and area from a straightened cpr slice
         :param cross_section: the binary straightened cpr slice as a numpy array
         :param pixel_spacing: the pixel spacing of the cpr slice
         :param diff_threshold: the maximum difference allowed between major and minor diameters.
             If |major - minor| > diff_threshold, set the average diameter = minor diameter to be conservative
-        :return: a dictionary containing the max, major, minor diameters, as well as the solidarity, cicularity, and eccentricity
+        :return: a dictionary containing the average, major, and minor diameters as well as the cross section area.
         """
         regions = _get_regions(cross_section)
-        data = {"max_area": np.nan, "max_diam": np.nan, "major_diam": np.nan, "minor_diam": np.nan}
+        data = {"diam": np.nan, "major_axis": np.nan, "minor_axis": np.nan, "area": np.nan}
         if len(regions) == 0:
             return data
         region = regions[0]
@@ -176,10 +177,10 @@ class StraightenedCPR:
         max_area = (cross_section == 1).sum() * np.prod(pixel_spacing)
         data.update(
             {
-                "max_area": max_area,
-                "max_diam": max_diam,
-                "major_diam": major_diam,
-                "minor_diam": minor_diam,
+                "diam": max_diam,
+                "major_axis": major_diam,
+                "minor_axis": minor_diam,
+                "area": max_area,
             }
         )
         return data
