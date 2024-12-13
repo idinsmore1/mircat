@@ -468,11 +468,12 @@ class Aorta(Segmentation):
     #### Write the statistics to a csv file
     def write_aorta_stats(self) -> None:
         """Write the aorta statistics to a csv file"""
-        str_coordinates = []
-        index = []
+        index, z, y, x = [], [], [], []
         for i, point in enumerate(self.centerline.centerline):
             index.append(i)
-            str_coordinates.append(f"{point[0]:.1f},{point[1]:.1f},{point[2]:.1f}")
+            z.append(point[0].round(1))
+            y.append(point[1].round(1))
+            x.append(point[2].round(1))
         regions = [None for _ in  range(len(index))]
         name_map = {'aortic_root': 'root', 'asc_aorta': 'ascending', 'aortic_arch': 'arch', 'desc_aorta': 'descending', 'abd_aorta': 'abdominal'}
         if self.thoracic_regions:
@@ -485,7 +486,8 @@ class Aorta(Segmentation):
         if self.region_existence['abdominal']['exists']:
             for i in self.region_existence['abdominal']['indices']:
                 regions[i] = 'abdominal'
-
+        segment_lengths = [0, *self.centerline.segment_lengths.round(2).tolist()]
+        cumulative_lengths = self.centerline.cumulative_lengths.round(2).tolist()
         diameters = [d['diam'] for d in self.aorta_diameters]
         major_axes = [d['major_axis'] for d in self.aorta_diameters]
         minor_axes = [d['minor_axis'] for d in self.aorta_diameters]
@@ -493,13 +495,26 @@ class Aorta(Segmentation):
         flatnesses = [d['flatness'] for d in self.aorta_diameters]
         roundnesses = [d['roundness'] for d in self.aorta_diameters]
         total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
-        in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
-        torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
+        in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[1].tolist()], None, None]
+        torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[2].tolist()], None, None]
+        for angle_list in [total_angles, in_plane_angles, torsional_angles]:
+            for i, angle in enumerate(angle_list):
+                if angle is not None:
+                    angle_val = round(np.rad2deg(angle))
+                    if angle_val == 180:
+                        angle_val = 0
+                    elif angle_val > 90:
+                        angle_val = 180 - angle_val
+                    angle_list[i] = angle_val
         df = pl.DataFrame(
             {
-                "index": index,
+                "centerline_index": index,
                 "region": regions,
-                "centerline_coord": str_coordinates,
+                "z_coordinate": z,
+                "y_coordinate": y,
+                "x_coordinate": x,
+                "segment_length_mm": segment_lengths,
+                "cumulative_length_mm": cumulative_lengths,
                 "area": areas,
                 "diameter": diameters,
                 "major_axis": major_axes,

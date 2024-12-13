@@ -325,7 +325,7 @@ class Centerline:
         """
         centerline = self.centerline
         diffs = np.diff(centerline, axis=0)
-        segment_lengths = np.linalg.norm(diffs, axis=1)
+        segment_lengths = np.sqrt(np.sum(diffs ** 2, axis=1))
         cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
         total_length = cumulative_lengths[-1]
         return segment_lengths, cumulative_lengths, total_length
@@ -390,7 +390,7 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], 
     SOAM and TI Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC2430603/#S6
     """
     segments = np.diff(centerline_arr, axis=0)
-    segment_lengths = np.linalg.norm(segments, axis=1)
+    segment_lengths = np.sqrt(np.sum(segments ** 2, axis=1))
     cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
     total_length = cumulative_lengths[-1]
     euclidean_distance = np.linalg.norm(centerline_arr[-1] - centerline_arr[0])
