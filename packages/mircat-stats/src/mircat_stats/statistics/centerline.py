@@ -389,15 +389,14 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], 
 
     SOAM and TI Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC2430603/#S6
     """
-    segments = np.diff(centerline_arr, axis=0)
-    segment_lengths = np.sqrt(np.sum(segments ** 2, axis=1))
-    cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
+    tangents = np.diff(centerline_arr, axis=0)
+    tangents = np.concatenate([[0., 0., 0.], tangents])
+    segment_lengths = np.sqrt(np.sum(tangents ** 2, axis=1))
+    cumulative_lengths = np.cumsum(segment_lengths)
     total_length = cumulative_lengths[-1]
-    euclidean_distance = np.linalg.norm(centerline_arr[-1] - centerline_arr[0])
+    euclidean_distance = np.sqrt(np.sum((centerline_arr[-1] - centerline_arr[0])**2))
     tortuosity_index = total_length / euclidean_distance if euclidean_distance > 0 else float("inf")
     # Calculate the sum of angles
-    cs = CubicSpline(cumulative_lengths, centerline_arr, bc_type="natural")
-    tangents = cs(cumulative_lengths, 1)
     angle_measures = _get_total_angles(tangents)
     total_angles = angle_measures[0]
     soam = np.sum(total_angles) / (total_length / 10)  # Sum of Angles should be in radians/cm
