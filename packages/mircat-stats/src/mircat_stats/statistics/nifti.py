@@ -212,10 +212,6 @@ class MircatNifti:
                 indices = shape_stats.GetIndexes(label)
                 z_indices = indices[2::3]
                 vert_midlines[f"{name}_midline"] = int(np.median(z_indices))
-        if "vertebrae_L1_midline" in vert_midlines and "vertebrae_T12_midline" in vert_midlines:
-            vert_midlines["vertebrae_T12L1_midline"] = int(
-                (vert_midlines["vertebrae_L1_midline"] + vert_midlines["vertebrae_T12_midline"]) / 2
-            )
         self.vert_midlines = vert_midlines
 
     def write_stats_to_file(self, output_stats: dict, all_completed: bool) -> None:

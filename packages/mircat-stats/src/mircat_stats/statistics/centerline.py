@@ -68,10 +68,10 @@ class Centerline:
         self._set_centerline_kwargs(kwargs)
 
     def __len__(self) -> int:
-        return len(self.centerline)
+        return len(self.coordinates)
 
     def __eq__(self, value: object) -> bool:
-        return np.array_equal(self.centerline, value)
+        return np.array_equal(self.coordinates, value)
 
     def create_centerline(self, segmentation: np.ndarray, **kwargs) -> None:
         """Create a centerline on the segmentation and set it as self.centerline
@@ -235,8 +235,8 @@ class Centerline:
         # Step 4: Map the ordered indices to the original vertices
         ordered_vertices = [vertices[idx] for idx in ordered_vertices_indices]
         # set the centerline
-        self.centerline = np.asarray(ordered_vertices)
-        self.raw_centerline = np.asarray(ordered_vertices)
+        self.coordinates = np.asarray(ordered_vertices)
+        self.raw_coordinates = np.asarray(ordered_vertices)
 
     def _resample_centerline_with_bspline(self, min_points: int, max_points: int, smoothing_factor: float) -> None:
         """Resample the centerline with a B-spline
@@ -249,7 +249,7 @@ class Centerline:
         smoothing_factor : float
             The B-spline smoothing factor (0-1)
         """
-        centerline = self.centerline
+        centerline = self.coordinates
         _, cumulative_lengths, total_length = self._calculate_centerline_metrics()
         # Determine the optimal number of points based on path length
         num_points: int = int(np.clip(int(total_length), min_points, max_points))
@@ -260,7 +260,7 @@ class Centerline:
         # Generate evenly spaced points along the spline
         u_new = np.linspace(0, 1, num_points)
         new_centerline = np.column_stack(splev(u_new, tck))
-        self.centerline = new_centerline
+        self.coordinates = new_centerline
 
     def _smooth_centerline(self, sigma: float) -> None:
         """Smooth the centerline with a gaussian filter
@@ -269,7 +269,7 @@ class Centerline:
         sigma : float
             The sigma value for the gaussian filter
         """
-        centerline = self.centerline
+        centerline = self.coordinates
         # Reflect points at boundaries to avoid edge effects
         n_reflect = int(4 * sigma)
         start_reflect = centerline[n_reflect:0:-1]
@@ -285,7 +285,7 @@ class Centerline:
         # Preserve the endpoints
         smoothed_centerline[0] = centerline[0]
         smoothed_centerline[-1] = centerline[-1]
-        self.centerline = smoothed_centerline
+        self.coordinates = smoothed_centerline
 
     def _savitzky_golay_filter_centerline(self, window_length: int) -> None:
         """Use a Savitzky-Golay filter to smooth centerline after gaussian smoothing
@@ -294,7 +294,7 @@ class Centerline:
         window_length : int
             The window length for the Savitzky-Golay filter in physical units (i.e. mm if spacing is in mm)
         """
-        centerline = self.centerline
+        centerline = self.coordinates
         polyorder = 2
         _, cumulative_lengths, _ = self._calculate_centerline_metrics()
         # Find window size based on cumulative length threshold
@@ -312,7 +312,7 @@ class Centerline:
             smoothed = np.zeros_like(centerline)
             for dim in range(3):
                 smoothed[:, dim] = savgol_filter(centerline[:, dim], window_size, polyorder)
-            self.centerline = smoothed
+            self.coordinates = smoothed
 
     def _calculate_centerline_metrics(self) -> tuple[np.ndarray, np.ndarray, float]:
         """
@@ -323,7 +323,7 @@ class Centerline:
         tuple[np.ndarray, np.ndarray, float]
             The segment lengths, cumulative lengths, and total length
         """
-        centerline = self.centerline
+        centerline = self.coordinates
         diffs = np.diff(centerline, axis=0)
         segment_lengths = np.sqrt(np.sum(diffs ** 2, axis=1))
         cumulative_lengths = np.concatenate([[0], np.cumsum(segment_lengths)])
@@ -336,7 +336,7 @@ class Centerline:
         """
         # Use the cumulative lengths of the centerline as the spline points
         spline_points = self.cumulative_lengths
-        cs = CubicSpline(spline_points, self.centerline, bc_type="natural")
+        cs = CubicSpline(spline_points, self.coordinates, bc_type="natural")
         # Compute the tangent vectors
         tangents = cs(spline_points, 1)
         # Normalize the tangent vectors
@@ -389,12 +389,6 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], 
 
     SOAM and TI Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC2430603/#S6
     """
-    # centerline_cumsums = np.cumsum(np.sqrt(np.sum(np.diff(centerline_arr,axis=0)**2, axis=1)))
-    # for i, cumsum in enumerate(centerline_cumsums):
-    #     if cumsum > 10:
-    #         slice_len = i  # Want to sample every 1 cm
-    #         break
-    # sampled_centerline = np.vstack([centerline_arr[0], centerline_arr[1:-1:slice_len], centerline_arr[-1]])
     tangents = np.diff(centerline_arr, axis=0)
     segment_lengths = np.sqrt(np.sum(tangents ** 2, axis=1))
     cumulative_lengths = np.cumsum(segment_lengths)

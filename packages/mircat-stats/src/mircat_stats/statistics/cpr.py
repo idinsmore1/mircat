@@ -1,5 +1,4 @@
 import numpy as np
-import SimpleITK as sitk
 
 from dataclasses import dataclass
 from scipy.interpolate import interpn
@@ -26,7 +25,7 @@ class StraightenedCPR:
         """
         cpr = []
         empty_slices = []
-        for i in range(len(self.centerline.centerline)):
+        for i in range(len(self.centerline.coordinates)):
             cross_section = self.extract_orthogonal_cross_section(i)
             if self.is_binary:
                 cross_section = StraightenedCPR._postprocess_cross_section(cross_section, self.sigma)
@@ -38,7 +37,7 @@ class StraightenedCPR:
 
         cpr = np.stack(cpr, axis=0)
         # remove the first and last cross-sections to avoid odd cuts
-        self.cpr_arr = cpr
+        self.array = cpr
         self.empty_slices = empty_slices
         return self
 
@@ -59,7 +58,7 @@ class StraightenedCPR:
         """
         # Set up the points and vectors
         arr = self.img
-        center_point = self.centerline.centerline[index]
+        center_point = self.centerline.coordinates[index]
         v1 = self.centerline.binormal_vectors[0][index]
         v2 = self.centerline.binormal_vectors[1][index]
         if v1 is None or v2 is None:
