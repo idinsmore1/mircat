@@ -488,15 +488,15 @@ class Aorta(Segmentation):
                 regions[i] = 'abdominal'
         segment_lengths = [0, *self.centerline.segment_lengths.round(2).tolist()]
         cumulative_lengths = self.centerline.cumulative_lengths.round(2).tolist()
-        diameters = [d['diam'] for d in self.aorta_diameters]
-        major_axes = [d['major_axis'] for d in self.aorta_diameters]
-        minor_axes = [d['minor_axis'] for d in self.aorta_diameters]
-        areas = [d['area'] for d in self.aorta_diameters]
-        flatnesses = [d['flatness'] for d in self.aorta_diameters]
-        roundnesses = [d['roundness'] for d in self.aorta_diameters]
-        total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None]
-        in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[1].tolist()], None, None]
-        torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[2].tolist()], None, None]
+        diameters = [d['diam'] if not np.isnan(d['diam']) else None for d in self.aorta_diameters]
+        major_axes = [d['major_axis'] if not np.isnan(d['major_axis']) else None for d in self.aorta_diameters]
+        minor_axes = [d['minor_axis'] if not np.isnan(d['minor_axis']) else None for d in self.aorta_diameters]
+        areas = [d['area'] if not np.isnan(d['area']) else None for d in self.aorta_diameters]
+        flatnesses = [d['flatness'] if not np.isnan(d['flatness']) else None for d in self.aorta_diameters]
+        roundnesses = [d['roundness'] if not np.isnan(d['roundness']) else None for d in self.aorta_diameters]
+        total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None, None]
+        in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[1].tolist()], None, None, None]
+        torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[2].tolist()], None, None, None]
         for angle_list in [total_angles, in_plane_angles, torsional_angles]:
             for i, angle in enumerate(angle_list):
                 if angle is not None:

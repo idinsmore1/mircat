@@ -389,8 +389,13 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], 
 
     SOAM and TI Reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC2430603/#S6
     """
+    # centerline_cumsums = np.cumsum(np.sqrt(np.sum(np.diff(centerline_arr,axis=0)**2, axis=1)))
+    # for i, cumsum in enumerate(centerline_cumsums):
+    #     if cumsum > 10:
+    #         slice_len = i  # Want to sample every 1 cm
+    #         break
+    # sampled_centerline = np.vstack([centerline_arr[0], centerline_arr[1:-1:slice_len], centerline_arr[-1]])
     tangents = np.diff(centerline_arr, axis=0)
-    tangents = np.concatenate([[0., 0., 0.], tangents])
     segment_lengths = np.sqrt(np.sum(tangents ** 2, axis=1))
     cumulative_lengths = np.cumsum(segment_lengths)
     total_length = cumulative_lengths[-1]
@@ -399,7 +404,10 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], 
     # Calculate the sum of angles
     angle_measures = _get_total_angles(tangents)
     total_angles = angle_measures[0]
-    soam = np.sum(total_angles) / (total_length / 10)  # Sum of Angles should be in radians/cm
+    if total_length <= 0:
+        soam = 0
+    else:
+        soam = np.sum(total_angles) / (total_length / 10)  # Sum of Angles should be in radians/cm
     return {"tort_idx": round(tortuosity_index, 1), "soam": round(soam, 1)}, angle_measures
 
 def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
