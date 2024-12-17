@@ -17,6 +17,7 @@ import json
 import numpy as np
 import SimpleITK as sitk
 
+from hashlib import sha256
 from pathlib import Path
 from loguru import logger
 
@@ -108,6 +109,7 @@ class MircatNifti:
 
         self.header_data["nifti_path"] = str(self.path.absolute())
         self.header_data["nii_file_name"] = str(self.nifti_name)
+        self.header_data['ct_id'] = sha256(str(self.path.absolute()).endcode()).hexdigest()
 
     def _check_seg_files(self, task_list: list[str]) -> None:
         """

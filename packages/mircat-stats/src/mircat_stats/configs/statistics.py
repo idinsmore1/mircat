@@ -28,6 +28,7 @@ aorta_region_columns = [
 ]
 stats_output_keys = [
     "nifti_path",
+    "ct_id",
     "mrn",
     "accession",
     "series_name",
