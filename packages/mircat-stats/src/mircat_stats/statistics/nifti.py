@@ -109,7 +109,7 @@ class MircatNifti:
 
         self.header_data["nifti_path"] = str(self.path.absolute())
         self.header_data["nii_file_name"] = str(self.nifti_name)
-        self.header_data['ct_id'] = sha256(str(self.path.absolute()).endcode()).hexdigest()
+        self.header_data['ct_id'] = sha256(str(self.path.absolute()).encode()).hexdigest()[:32]
 
     def _check_seg_files(self, task_list: list[str]) -> None:
         """

@@ -78,7 +78,7 @@ class Aorta(Segmentation):
         ]
         midlines = [midline for midline in midlines if midline]
         start = min(midlines)
-        end = max(midlines) + 1  # add one to make it inclusive
+        end = max(midlines)  # add one to make it inclusive
         return start, end
 
     #### STATISTICS OPERATIONS
@@ -163,8 +163,8 @@ class Aorta(Segmentation):
             aorta_regions["descending"] = indices
         # Upper abdominal aorta is between T12 and L2, but L1 will suffice for existence as it may be cut off
         upper_abd = bool(self.vert_midlines.get('vertebrae_T12_midline', False) and self.vert_midlines.get('vertebrae_L1_midline', False))
-        # Lower abdominal just needs L2 - will check below when getting end points
-        lower_abd = bool(self.vert_midlines.get('vertebrae_L2_midline', False))
+        # Lower abdominal just needs L2 and L3- will check below when getting end points
+        lower_abd = bool(self.vert_midlines.get('vertebrae_L2_midline', False) and self.vert_midlines.get('vertebrae_L3_midline', False))
         if upper_abd:
             start, end = self._find_aortic_region_endpoints("upper_abd", self.vert_midlines)
             indices = self._get_region_indices(start, end)
@@ -364,6 +364,8 @@ class Aorta(Segmentation):
     def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
         "Measure the statistics for a specific region of the aorta"
         region_stats = {}
+        if len(indices) < 3:
+            return region_stats # not enough points to measure
         try:
             # Region length
             region_cumulative_lengths = self.centerline.cumulative_lengths[indices]
