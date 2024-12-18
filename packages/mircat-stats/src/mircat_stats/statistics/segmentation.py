@@ -150,7 +150,7 @@ class Segmentation:
         bbox_filter.SetComputeOrientedBoundingBox(True)
         bbox_filter.Execute(self.segmentation)
         bbox = bbox_filter.GetBoundingBox(1)
-
+        self.bbox = bbox
         # Set up the cropping filter
         start_idx = list(bbox[0:3])
         size = list(bbox[3:6])
@@ -168,6 +168,28 @@ class Segmentation:
         # Extract from segmentation
         cropped_seg = extract.Execute(self.segmentation)
         cropped_img = extract.Execute(self.original_ct)
-        self.cropped_seg = sitk.GetArrayFromImage(cropped_seg)
-        self.cropped_ct = sitk.GetArrayFromImage(cropped_img)
+        self.cropped_seg = cropped_seg
+        self.cropped_ct = cropped_img
         return self
+
+    def _make_SPR_numpy_array(self, on_cropped: bool=False) -> None:
+        """Convert the images to numpy arrays with with axes in SPR (S, P, R) format. Superior (0) -> Inferior (N - 1), Anterior -> Posterior, Left -> Right
+        Parameters
+        ----------
+        on_cropped : bool
+            Use the cropped bounding box image for the conversion instead of the full image
+        """
+        if on_cropped:
+            assert hasattr(self, "cropped_seg"), ValueError("Cropped segmentation must be extracted before conversion")
+            assert hasattr(self, "cropped_ct"), ValueError("Cropped CT image must be extracted before conversion")
+            seg = self.cropped_seg
+            ct = self.cropped_ct
+        else:
+            seg = self.segmentation
+            ct = self.original_ct
+
+        self.segmentation_arr = np.flip(np.flipud(sitk.GetArrayFromImage(seg)), axis=1)
+        self.original_ct_arr = np.flip(np.flipud(sitk.GetArrayFromImage(ct)), axis=1)
+        # Adjust the vertebral midlines to account for the flip
+        new_midlines = {k: (self.segmentation_arr.shape[0] - 1) - v for k, v in self.vert_midlines.items()}
+        self.vert_midlines = new_midlines

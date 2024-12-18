@@ -1,7 +1,6 @@
 aorta_region_columns = [
     "length_mm",
     "tort_idx",
-    "soam",
     "max_diam",
     "max_major_axis",
     "max_minor_axis",

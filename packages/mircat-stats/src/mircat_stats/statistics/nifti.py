@@ -241,6 +241,8 @@ class MircatNifti:
                 value = float(value)
             if isinstance(value, np.ndarray):
                 value = value.tolist()
+            if value == 'NaN':
+                value = None
             output_stats[key] = value
         with self.output_file.open("w") as f:
             json.dump(output_stats, f, indent=4)

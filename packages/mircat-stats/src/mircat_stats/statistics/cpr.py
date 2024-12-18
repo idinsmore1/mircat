@@ -1,7 +1,6 @@
 import numpy as np
 
 from dataclasses import dataclass
-from scipy.interpolate import interpn
 from mircat_stats.statistics.centerline import Centerline
 from mircat_stats.statistics.utils import _get_regions
 from skimage.filters import gaussian
@@ -71,26 +70,19 @@ class StraightenedCPR:
         x_grid, y_grid = np.meshgrid(x_lin, y_lin)
         # Map the grid points to the 3D array indices
         slice_points = center_point + x_grid[..., np.newaxis] * v1 + y_grid[..., np.newaxis] * v2
-        # if self.is_binary:
-        if True:  # For testing
-            slice_points = np.rint(slice_points).astype(int)
-            # Initialize an empty slice with zeros (padding)
-            slice_2d = np.zeros((int(height / resolution), int(width / resolution)), dtype=arr.dtype)
-            if arr.min() != 0:
-                slice_2d += arr.min()
-            # Compute valid index ranges considering the boundaries
-            valid_x = (slice_points[..., 0] >= 0) & (slice_points[..., 0] < arr.shape[0])
-            valid_y = (slice_points[..., 1] >= 0) & (slice_points[..., 1] < arr.shape[1])
-            valid_z = (slice_points[..., 2] >= 0) & (slice_points[..., 2] < arr.shape[2])
-            valid_indices = valid_x & valid_y & valid_z
-            # Extract values for valid indices and assign to the slice, leave zeros elsewhere
-            valid_points = slice_points[valid_indices]
-            slice_2d[valid_indices] = arr[valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]]
-        else:
-            x = np.arange(arr.shape[0])
-            y = np.arange(arr.shape[1])
-            z = np.arange(arr.shape[2])
-            slice_2d = interpn((x, y, z), arr, slice_points, method="linear", bounds_error=False, fill_value=arr.min())
+        slice_points = np.rint(slice_points).astype(int)
+        # Initialize an empty slice with zeros (padding)
+        slice_2d = np.zeros((int(height / resolution), int(width / resolution)), dtype=arr.dtype)
+        if arr.min() != 0:
+            slice_2d += arr.min()
+        # Compute valid index ranges considering the boundaries
+        valid_x = (slice_points[..., 0] >= 0) & (slice_points[..., 0] < arr.shape[0])
+        valid_y = (slice_points[..., 1] >= 0) & (slice_points[..., 1] < arr.shape[1])
+        valid_z = (slice_points[..., 2] >= 0) & (slice_points[..., 2] < arr.shape[2])
+        valid_indices = valid_x & valid_y & valid_z
+        # Extract values for valid indices and assign to the slice, leave zeros elsewhere
+        valid_points = slice_points[valid_indices]
+        slice_2d[valid_indices] = arr[valid_points[:, 0], valid_points[:, 1], valid_points[:, 2]]
         return slice_2d
 
     @staticmethod
@@ -161,7 +153,7 @@ class StraightenedCPR:
         :return: a dictionary containing the average, major, and minor diameters as well as the cross section area.
         """
         regions = _get_regions(cross_section)
-        data = {"diam": np.nan, "major_axis": np.nan, "minor_axis": np.nan, "area": np.nan, "flatness": np.nan, "roundness": np.nan}
+        data = {}
         if len(regions) == 0:
             return data
         region = regions[0]
@@ -175,16 +167,16 @@ class StraightenedCPR:
         else:
             diam = min(major_diam, minor_diam)
         area = region.area * pixel_spacing[0] * pixel_spacing[1]
-        flatness = major_diam / minor_diam
-        roundness = (4 * np.pi * area) / (region.perimeter) ** 2
+        flatness = round(major_diam / minor_diam, 2) if minor_diam != 0 else None
+        roundness = round((4 * np.pi * area) / (region.perimeter) ** 2, 2) if region.perimeter != 0 else None
         data.update(
             {
                 "diam": diam,
                 "major_axis": major_diam,
                 "minor_axis": minor_diam,
                 "area": area,
-                "flatness": round(flatness, 2),
-                "roundness": round(roundness, 2)
+                "flatness": flatness,
+                "roundness": roundness
             }
         )
         return data

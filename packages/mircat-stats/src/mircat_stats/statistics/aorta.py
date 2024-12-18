@@ -1,6 +1,6 @@
 import numpy as np
 import SimpleITK as sitk
-import polars as pl
+import pandas as pd
 
 from operator import itemgetter
 from loguru import logger
@@ -28,16 +28,17 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     # Filter to the segmentations we need
     try:
         aorta = Aorta(nifti)
+        # Calculate the aorta statistics
+        aorta_stats = aorta.measure_statistics()
+        aorta.write_aorta_stats()
+        return aorta_stats
     except SegNotFoundError:
         logger.opt(exception=True).error(f"No aorta found in {nifti.path}")
         return {}
-    except Exception:
-        logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}")
+    except Exception as e:
+        logger.opt(exception=True).error(f"Error filtering to aorta in {nifti.path}: {e}")
         return {}
-    # Calculate the aorta statistics
-    aorta_stats = aorta.measure_statistics()
-    return aorta_stats
-
+    
 
 class Aorta(Segmentation):
     # This is the list of all vertebrae that could potentially show in specific regions of the aorta
@@ -57,17 +58,9 @@ class Aorta(Segmentation):
 
     def __init__(self, nifti: MircatNifti):
         super().__init__(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
-        self._make_aorta_superior_numpy_array()
+        self._make_SPR_numpy_array()
 
     #### INITIALIZATION OPERATIONS
-    def _make_aorta_superior_numpy_array(self) -> None:
-        """Convert the aorta segmentation to a numpy array with the arch at the top and adjust vertebral midlines"""
-        self.segmentation_arr = np.flip(np.flipud(sitk.GetArrayFromImage(self.segmentation)), axis=1)
-        self.original_ct_arr = np.flip(np.flipud(sitk.GetArrayFromImage(self.original_ct)), axis=1)
-        # Adjust the vertebral midlines to account for the flip
-        new_midlines = {k: (self.segmentation_arr.shape[0] - 1) - v for k, v in self.vert_midlines.items()}
-        self.vert_midlines = new_midlines
-
     @staticmethod
     def _find_aortic_region_endpoints(region: str, vert_midlines: dict) -> tuple[int, int]:
         possible_locs = Aorta.vertebral_regions_map[region]
@@ -337,7 +330,7 @@ class Aorta(Segmentation):
         np.ndarray
             The array of masked periaortic fat
         """
-        diams = [d["diam"] for d in aortic_diameters]
+        diams = [d.get('diam', np.nan) for d in aortic_diameters]
         seg_cpr = self.seg_cpr.array
         ct_cpr = np.clip(self.original_cpr.array, -250, 250)  # clip to HU range to remove artifacts
         periaortic_fat = np.zeros_like(seg_cpr, dtype=np.uint8)
@@ -432,7 +425,7 @@ class Aorta(Segmentation):
         mid = {f'mid_{k}': v for k, v in region_diameters[mid_idx].items()}
         # extract the distal region diameter
         for i, diam in enumerate(region_diameters[::-1]):
-            if not np.isnan(diam["diam"]):
+            if not np.isnan(diam.get('diam', np.nan)):
                 dist_idx = i
                 break
         distal = {f'dist_{k}': v for k, v in region_diameters[::-1][dist_idx].items()}
@@ -469,41 +462,29 @@ class Aorta(Segmentation):
             y.append(point[1].round(1))
             x.append(point[2].round(1))
         regions = [None for _ in  range(len(index))]
-        name_map = {'aortic_root': 'root', 'asc_aorta': 'ascending', 'aortic_arch': 'arch', 'desc_aorta': 'descending', 'up_abd_aorta': 'upper_abdominal', 'lw_abd_aorta': 'lower_abdominal'}
-        # if self.thoracic_regions:
-        #     for region, indices in self.thoracic_regions.items():
-        #         for idx in indices:
-        #             regions[idx] = name_map.get(region)
-        # elif self.region_existence["descending"]["exists"]:
-        #     for i in self.region_existence["descending"]["indices"]:
-        #         regions[i] = "descending"
-        # if self.region_existence['abdominal']['exists']:
-        #     for i in self.region_existence['abdominal']['indices']:
-        #         regions[i] = 'abdominal'
+        name_map = {
+            'aortic_root': 'root',
+            'asc_aorta': 'ascending', 
+            'aortic_arch': 'arch', 
+            'desc_aorta': 'descending', 
+            'up_abd_aorta': 'upper_abdominal', 
+            'lw_abd_aorta': 'lower_abdominal'
+        }
         for region, indices in self.aorta_regions.items():
             for idx in indices:
                 regions[idx] = name_map.get(region)
         segment_lengths = [0, *self.centerline.segment_lengths.round(2).tolist()]
         cumulative_lengths = self.centerline.cumulative_lengths.round(2).tolist()
-        diameters = [d['diam'] if not np.isnan(d['diam']) else None for d in self.cross_section_data]
-        major_axes = [d['major_axis'] if not np.isnan(d['major_axis']) else None for d in self.cross_section_data]
-        minor_axes = [d['minor_axis'] if not np.isnan(d['minor_axis']) else None for d in self.cross_section_data]
-        areas = [d['area'] if not np.isnan(d['area']) else None for d in self.cross_section_data]
-        flatnesses = [d['flatness'] if not np.isnan(d['flatness']) else None for d in self.cross_section_data]
-        roundnesses = [d['roundness'] if not np.isnan(d['roundness']) else None for d in self.cross_section_data]
-        total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None, None]
-        in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[1].tolist()], None, None, None]
-        torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[2].tolist()], None, None, None]
-        for angle_list in [total_angles, in_plane_angles, torsional_angles]:
-            for i, angle in enumerate(angle_list):
-                if angle is not None:
-                    angle_val = round(np.rad2deg(angle))
-                    if angle_val == 180:
-                        angle_val = 0
-                    elif angle_val > 90:
-                        angle_val = 180 - angle_val
-                    angle_list[i] = angle_val
-        df = pl.DataFrame(
+        diameters = [d.get('diam') for d in self.cross_section_data]
+        major_axes = [d.get('major_axis') for d in self.cross_section_data]
+        minor_axes = [d.get('minor_axis') for d in self.cross_section_data]
+        areas = [d.get('area') for d in self.cross_section_data]
+        flatnesses = [d.get('flatness') for d in self.cross_section_data]
+        roundnesses = [d.get('roundness') for d in self.cross_section_data]
+        # total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None, None]
+        # in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[1].tolist()], None, None, None]
+        # torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[2].tolist()], None, None, None]
+        df = pd.DataFrame(
             {
                 "centerline_index": index,
                 "region": regions,
@@ -518,12 +499,11 @@ class Aorta(Segmentation):
                 "minor_axis": minor_axes,
                 "flatness": flatnesses,
                 "roundness": roundnesses,
-                "total_angle": total_angles,
-                "in_plane_angle": in_plane_angles,
-                "torsional_angle": torsional_angles,
+                # "total_angle": total_angles,
+                # "in_plane_angle": in_plane_angles,
+                # "torsional_angle": torsional_angles,
             },
-            strict=False,
-            nan_to_null=True,
         )
+
         output_path = self.seg_folder / f'{self.nifti_name}_aorta.csv'
-        df.write_csv(output_path)
+        df.to_csv(output_path, index=False)

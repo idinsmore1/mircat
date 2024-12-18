@@ -397,12 +397,13 @@ def calculate_tortuosity(centerline_arr: np.ndarray) -> tuple[dict[str, float], 
     tortuosity_index = total_length / euclidean_distance if euclidean_distance > 0 else float("inf")
     # Calculate the sum of angles
     angle_measures = _get_total_angles(tangents)
-    total_angles = angle_measures[0]
-    if total_length <= 0:
-        soam = 0
-    else:
-        soam = np.sum(total_angles) / (total_length / 10)  # Sum of Angles should be in radians/cm
-    return {"tort_idx": round(tortuosity_index, 1), "soam": round(soam, 1)}, angle_measures
+    # total_angles = angle_measures[0]
+    # if total_length <= 0:
+    #     soam = 0
+    # else:
+    #     soam = np.sum(total_angles) / (total_length / 10)  # Sum of Angles should be in radians/cm
+    
+    return {"tort_idx": round(tortuosity_index, 1)}, angle_measures
 
 def _get_total_angles(tangents: np.ndarray) -> np.ndarray:
     """
