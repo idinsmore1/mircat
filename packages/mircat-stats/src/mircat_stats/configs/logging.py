@@ -49,6 +49,7 @@ def formatter(record):
 def configure_logging(log_file_path, verbose: bool):
     # Remove all handlers
     logger.remove()
+    logger.level("AORTA", no=10, color="<magenta>")
     # Log all logs except INFO to a file
     logger.add(
         log_file_path,

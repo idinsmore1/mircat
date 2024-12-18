@@ -139,10 +139,10 @@ def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bo
                 all_completed = True
         nifti.write_stats_to_file(all_stats, all_completed)
         log_text = '\n'.join([
-            f"Stats Complete!",
+            "Stats Complete!",
             f"\tOutput File: {nifti.output_file}",
             f"\tComplete Stats: {all_completed}",
-            f"\tTimings:",
+            "\tTimings:",
             f"\t  Contrast Prediction: {contrast_time}s",
             f"\t  Total Stats: {total_time}s",
             f"\t  Aorta Stats: {aorta_time}s",
@@ -153,10 +153,10 @@ def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bo
             log_text,
             extra={
                 "key": "statistics",
-                "input_nifti": str(nifti),
+                "input_nifti": str(nifti.absolute()),
                 "completed": all_completed,
                 "failed_reason": None,
-                "output_file": str(nifti.output_file),
+                "output_file": str(nifti.output_file.absolute()),
                 "contrast_pred_time": contrast_time,
                 "total_stats_time": total_time,
                 "aorta_stats_time": aorta_time,
@@ -208,18 +208,18 @@ def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bo
                 "body_and_tissues_time": None,
             },
         )
-    # except Exception as e:
-    #     logger.error(
-    #         f"Stats for {input_nifti} failed. {e}",
-    #         extra={
-    #             "key": "statistics",
-    #             "input_nifti": input_nifti,
-    #             "completed": False,
-    #             "failed_reason": "unknown",
-    #             "output_file": None,
-    #             "contrast_pred_time": None,
-    #             "total_stats_time": None,
-    #             "aorta_stats_time": None,
-    #             "body_and_tissues_time": None,
-    #         },
-    #     )
+    except Exception as e:
+        logger.error(
+            f"Stats for {input_nifti} failed. {e}",
+            extra={
+                "key": "statistics",
+                "input_nifti": input_nifti,
+                "completed": False,
+                "failed_reason": "unknown",
+                "output_file": None,
+                "contrast_pred_time": None,
+                "total_stats_time": None,
+                "aorta_stats_time": None,
+                "body_and_tissues_time": None,
+            },
+        )

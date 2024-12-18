@@ -504,3 +504,4 @@ class Aorta(Segmentation):
 
         output_path = self.seg_folder / f'{self.nifti_name}_aorta.csv'
         df.to_csv(output_path, index=False)
+        logger.log("AORTA", f"Aorta statistics written to {output_path}", extra={'output_path': str(output_path.absolute())})
