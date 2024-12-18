@@ -1,10 +1,11 @@
 import argparse
+from loguru import logger
 from pathlib import Path
-from mircat_stats.configs.logging import configure_logging, get_project_root
+from mircat_stats.configs.logging import configure_logging
+from mircat_stats.configs import set_num_threads
 from threadpoolctl import threadpool_limits
 from mircat_stats.dicom import convert_dicom_folders_to_nifti, update
 from mircat_stats.statistics import calculate_nifti_stats
-import shutil
 
 
 def mircat_stats():
@@ -12,34 +13,30 @@ def mircat_stats():
     MirCAT Stats Only CLI tool
     """
     parser = argparse.ArgumentParser(description="Mircato Stats Only CLI tool")
-    parser.add_argument(
-        "-q", "--quiet", help="Decrease output verbosity", action="store_true"
-    )
+    parser.add_argument("-q", "--quiet", help="Decrease output verbosity", action="store_true")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Create the 'convert' subparser
     convert_parser = subparsers.add_parser("convert", help="Convert DICOM files")
     convert_parser.add_argument("dicoms", help="Path to DICOM files", type=Path)
     convert_parser.add_argument("output_dir", help="Output directory", type=Path)
-    convert_parser.add_argument(
-        "-n", "--num-workers", help="Number of something", type=int, default=1
-    )
+    convert_parser.add_argument("-n", "--num-workers", help="Number of something", type=int, default=1)
     convert_parser.add_argument(
         "-ax",
         "--axial-only",
         help="Only convert axial dicom series",
         action="store_true",
     )
+    convert_parser.add_argument("-nm", "--no-mip", help="Do not convert likely mip series", action="store_true")
     convert_parser.add_argument(
-        "-nm", "--no-mip", help="Do not convert likely mip series", action="store_true"
-    )
-    convert_parser.add_argument(
-        "-th", "--threads", help="Number of threads for each worker", type=int, default=1
+        "-th",
+        "--threads",
+        help="Number of threads for each worker",
+        type=int,
+        default=1,
     )
     # Set up stats parser
-    stats_parser = subparsers.add_parser(
-        "stats", description="Calculate statistics for NIfTI files"
-    )
+    stats_parser = subparsers.add_parser("stats", description="Calculate statistics for NIfTI files")
     stats_parser.add_argument(
         "niftis",
         type=Path,
@@ -74,10 +71,10 @@ def mircat_stats():
         help="Mark the statistics as complete regardless of stats performed",
     )
     stats_parser.add_argument(
-        '-g',
-        '--gaussian',
-        action='store_true',
-        help='Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling'
+        "-g",
+        "--gaussian",
+        action="store_true",
+        help="Apply a gaussian smoothing to the label segmentations. Will be slower but more precise upon scaling",
     )
     # Create update parser
     update_parser = subparsers.add_parser(
@@ -85,13 +82,12 @@ def mircat_stats():
         help="Update the header and stats data for a NIfTI file to the latest version",
     )
     update_parser.add_argument("niftis", help="Path to NIfTI files", type=Path)
-    update_parser.add_argument(
-        "-n", "--num-workers", help="Number of workers", type=int, default=1
-    )
+    update_parser.add_argument("-n", "--num-workers", help="Number of workers", type=int, default=1)
     update_parser.add_argument("-th", "--threads", help="Number of threads", type=int, default=1)
 
     args = parser.parse_args()
     args.verbose = not args.quiet
+    set_num_threads(args.threads)
     threadpool_limits(limits=args.threads)
     if args.command == "convert":
         if args.dicoms.is_dir():
@@ -110,6 +106,7 @@ def mircat_stats():
             args.no_mip,
             args.verbose,
         )
+
     elif args.command == "stats" or args.command == "update":
         # If the input to the niftis argument is just a singular nifti file, make it a list and log in the same dir
         if args.niftis.suffixes == [".nii", ".gz"] or args.niftis.suffix == ".nii":
@@ -122,20 +119,20 @@ def mircat_stats():
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
         configure_logging(logfile, args.verbose)
-    
+
         if args.command == "stats":
-            
             calculate_nifti_stats(
                 nifti_list,
                 args.task_list,
                 args.num_workers,
                 args.threads,
                 args.mark_complete,
-                args.gaussian
+                args.gaussian,
             )
         elif args.command == "update":
             update(nifti_list, args.num_workers)
         else:
             print("Unknown command")
 
-
+if __name__ == "__main__":
+    mircat_stats()

@@ -1,6 +1,7 @@
 import os
 import SimpleITK as sitk
-from threadpoolctl import threadpool_limits
+
+from loguru import logger
 
 
 def set_num_threads(num_threads: int) -> None:

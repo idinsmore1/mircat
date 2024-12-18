@@ -76,6 +76,35 @@ torch_model_configs = {
             "iliac_vena_right": 66,
         },
     },
+    "cardiac": {
+        "name": "cardiac",
+        "spacing": [1.5, 1.5, 1.5],
+        "patch_size": [128, 128, 128],
+        "percentile_005": -101,
+        "percentile_995": 813,
+        "mean": 142.1977119916391,
+        "std": 154.74032651622053,
+        "output_map": {
+            "heart": 1,
+            "aorta": 2,
+            "pulmonary_vein": 3,
+            "brachiocephalic_trunk": 4,
+            "subclavian_artery_right": 5,
+            "subclavian_artery_left": 6,
+            "carotid_artery_right": 7,
+            "carotid_artery_left": 8,
+            "brachiocephalic_vein_left": 9,
+            "brachiocephalic_vein_right": 10,
+            "atrial_appendage_left": 11,
+            "superior_vena_cava": 12,
+            "inferior_vena_cava": 13,
+            "portal_and_splenic_vein": 14,
+            "iliac_artery_left": 15,
+            "iliac_artery_right": 16,
+            "iliac_vena_left": 17,
+            "iliac_vena_right": 18,
+        },
+    },
     "body": {
         "name": "body",
         "spacing": [1.5, 1.5, 1.5],
@@ -99,10 +128,4 @@ torch_model_configs = {
 }
 # Calculate the crop threshold using model vals
 for config in torch_model_configs.values():
-    config["crop_threshold"] = (config["percentile_005"] - config["mean"]) / config[
-        "std"
-    ]
-
-nnunet_model_configs = {
-    # Fill in configs here later
-}
+    config["crop_threshold"] = (config["percentile_005"] - config["mean"]) / config["std"]

@@ -1,17 +1,15 @@
 from mircat_stats.configs.models import torch_model_configs
 from mircat_stats.configs.logging import timer
-from mircat_stats.statistics.nifti import NiftiMircato
+from mircat_stats.statistics.nifti import MircatNifti
 from mircat_stats.statistics.utils import _calculate_3d_volumes, _calculate_2d_areas
 
 
 @timer
-def calculate_body_and_tissues_stats(
-    nifti: NiftiMircato, vert_midlines: dict
-) -> dict[str:float]:
+def calculate_body_and_tissues_stats(nifti: MircatNifti) -> dict[str:float]:
     """Calculate the body and tissue statistics
     Parameters
     ----------
-    nifti : NiftiMircato
+    nifti : MircatNifti
         The nifti file to calculate statistics for
     vert_midlines : dict
         The vertebral midlines
@@ -20,6 +18,7 @@ def calculate_body_and_tissues_stats(
     dict
         The statistics for the body and tissues
     """
+    vert_midlines = nifti.vert_midlines
     body_map = torch_model_configs["body"]["output_map"]
     tissues_map = torch_model_configs["tissues"]["output_map"]
     # Set the segmentations
@@ -50,20 +49,14 @@ def calculate_body_and_tissues_stats(
             vert_midlines.get("vertebrae_L1_midline") + 1,
         )
         abd_body_volumes = _calculate_3d_volumes(body, body_map, prefix, endpoints)
-        abd_tissues_volumes = _calculate_3d_volumes(
-            tissues, tissues_map, prefix, endpoints
-        )
+        abd_tissues_volumes = _calculate_3d_volumes(tissues, tissues_map, prefix, endpoints)
         output_stats.update(abd_body_volumes)
         output_stats.update(abd_tissues_volumes)
     # Get the vertebrae specific values
     for vert, midline in vert_indices.items():
         prefix = f"{vert}_"
-        body_vert_stats = _calculate_2d_areas(
-            body, body_map, midline, prefix, get_perimeter=True
-        )
-        tissues_vert_stats = _calculate_2d_areas(
-            tissues, tissues_map, midline, prefix, get_perimeter=False
-        )
+        body_vert_stats = _calculate_2d_areas(body, body_map, midline, prefix, get_perimeter=True)
+        tissues_vert_stats = _calculate_2d_areas(tissues, tissues_map, midline, prefix, get_perimeter=False)
         output_stats.update(body_vert_stats)
         output_stats.update(tissues_vert_stats)
     return output_stats

@@ -1,10 +1,9 @@
 import sys
 import json
 
+from loguru import logger
 from time import time
 from pathlib import Path
-
-from loguru import logger
 
 
 # Quick timing wrapper
@@ -50,11 +49,11 @@ def formatter(record):
 def configure_logging(log_file_path, verbose: bool):
     # Remove all handlers
     logger.remove()
+    logger.level("AORTA", no=10, color="<magenta>")
     # Log all logs except INFO to a file
     logger.add(
         log_file_path,
         format=formatter,
-        # serialize=True,
         level="DEBUG",
         rotation="10 GB",
         compression="gz",
@@ -66,29 +65,27 @@ def configure_logging(log_file_path, verbose: bool):
         # Print INFO and SUCCESS logs to stdout and WARNING, ERROR, and CRITICAL to stderr
         logger.add(
             sys.stdout,
-            colorize=True,
-            format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> <level>{message}</level>",
+            # colorize=True,
+            format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>",
             level="INFO",
             filter=lambda record: record["level"].name in ["INFO", "SUCCESS"],
             enqueue=True,
         )
         logger.add(
             sys.stderr,
-            colorize=True,
+            # colorize=True,
             format="<red>{time: DD-MM-YYYY -> HH:mm:ss}</red> <level>{message}</level>",
             level="WARNING",
-            filter=lambda record: record["level"].name
-            not in ["DEBUG", "INFO", "SUCCESS"],
+            filter=lambda record: record["level"].name not in ["DEBUG", "INFO", "SUCCESS"],
             enqueue=True,
         )
     else:
         # Only print INFO logs to stdout
         logger.add(
             sys.stdout,
-            colorize=True,
+            # colorize=True,
             format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> <level>{message}</level>",
             level="INFO",
             filter=lambda record: record["level"].name == "INFO",
             enqueue=True,
         )
-    # Always print WARNING, ERROR, and CRITICAL to stderr

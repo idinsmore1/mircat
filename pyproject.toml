@@ -5,13 +5,8 @@ description = "Mirshahi CT Analysis Toolkit (MirCAT). Convert, Segment, and Quan
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 dependencies = [
-    "loguru>=0.7.2",
-    "nibabel>=5.2.1",
-    "numpy>=1.26",
-    "scipy==1.13.1",
-    "threadpoolctl>=3.5.0",
     "mircat-seg",
-    "mircat-stats"
+    "mircat-stats",
 ]
 
 [project.scripts]
@@ -27,3 +22,6 @@ mircat-stats = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/mircat-seg", "packages/mircat-stats"]
+
+[tool.ruff]
+line-length = 120

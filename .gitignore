@@ -3,6 +3,7 @@
 *.pth
 *.pt
 *.ipynb
+src/tests/
 # Byte-compiled / optimized / DLL files
 data/
 __pycache__/
@@ -83,7 +84,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-
+*.ipynb
 # IPython
 profile_default/
 ipython_config.py
