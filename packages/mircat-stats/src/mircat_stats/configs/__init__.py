@@ -1,6 +1,8 @@
 import os
 import SimpleITK as sitk
 
+from loguru import logger
+
 
 def set_num_threads(num_threads: int) -> None:
     """Set the number of threads available for every linear algebra related process (Numpy, Pytorch, SimpleITK, etc)

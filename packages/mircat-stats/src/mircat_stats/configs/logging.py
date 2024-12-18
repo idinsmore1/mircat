@@ -1,6 +1,7 @@
 import sys
 import json
 
+from loguru import logger
 from time import time
 from pathlib import Path
 
@@ -45,14 +46,13 @@ def formatter(record):
     return "{extra[serialized]}\n"
 
 
-def configure_logging(logger, log_file_path, verbose: bool):
+def configure_logging(log_file_path, verbose: bool):
     # Remove all handlers
     logger.remove()
     # Log all logs except INFO to a file
     logger.add(
         log_file_path,
         format=formatter,
-        serialize=True,
         level="DEBUG",
         rotation="10 GB",
         compression="gz",
@@ -65,7 +65,7 @@ def configure_logging(logger, log_file_path, verbose: bool):
         logger.add(
             sys.stdout,
             # colorize=True,
-            format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> <level>{message}</level>",
+            format="<green>{time: DD-MM-YYYY -> HH:mm:ss}</green> | <level>{level}</level> | <level>{message}</level>",
             level="INFO",
             filter=lambda record: record["level"].name in ["INFO", "SUCCESS"],
             enqueue=True,

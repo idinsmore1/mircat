@@ -24,6 +24,7 @@ dependencies = [
 
 [project.scripts]
 mircat-stats = "mircat_stats:mircat_stats"
+log-test = "mircat_stats.configs.logging:log_test"
 
 [build-system]
 requires = ["hatchling"]

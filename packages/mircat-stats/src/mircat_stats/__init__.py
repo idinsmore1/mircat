@@ -97,7 +97,7 @@ def mircat_stats():
             logfile = f'{args.dicoms.with_suffix("")}_conversion_log.json'
             with args.dicoms.open() as f:
                 dicom_list = f.read().splitlines()
-        configure_logging(logger, logfile, args.verbose)
+        configure_logging(logfile, args.verbose)
         convert_dicom_folders_to_nifti(
             dicom_list,
             args.output_dir,
@@ -118,7 +118,7 @@ def mircat_stats():
             logfile = f"{args.niftis.with_suffix('')}_{args.command}_log.jsonl"
             with args.niftis.open() as f:
                 nifti_list = [x for x in f.read().splitlines()]
-        configure_logging(logger, logfile, args.verbose)
+        configure_logging(logfile, args.verbose)
 
         if args.command == "stats":
             calculate_nifti_stats(
@@ -133,3 +133,6 @@ def mircat_stats():
             update(nifti_list, args.num_workers)
         else:
             print("Unknown command")
+
+if __name__ == "__main__":
+    mircat_stats()

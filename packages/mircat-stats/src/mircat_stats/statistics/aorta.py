@@ -198,7 +198,6 @@ class Aorta(Segmentation):
         arch_segs_in_cpr = np.all(np.isin([2, 3], np.unique(thoracic_cpr)))
         # Split the arch from the ascending and descending
         if arch_segs_in_cpr:
-            logger.debug("Using segmentations to define the aortic arch")
             # use the segmentations to define the physical region of the arch
             brach_label = 2
             left_subclavian_label = 3
@@ -213,7 +212,6 @@ class Aorta(Segmentation):
                     arch_end = len(thoracic_cpr) - slice_idx
                     break
         else:
-            logger.debug("Using centerline to define the aortic arch")
             # use the top-down view of the aorta to find the arch - less good
             min_pixel_area = 50
             # This is the peak of the centerline
@@ -295,9 +293,8 @@ class Aorta(Segmentation):
         aorta_stats['aorta_length_mm'] = round(cumulative_length, 0)
         # Calculate tortuosity
         centerline = self.centerline.coordinates
-        tortuosity, angle_measures = calculate_tortuosity(centerline)
+        tortuosity = calculate_tortuosity(centerline)
         tortuosity = {f"aorta_{k}": v for k, v in tortuosity.items()}
-        self.angles_of_centerline = angle_measures
         aorta_stats.update(tortuosity)
         # Measure diameters for each slice of the cpr
         seg_cpr = self.seg_cpr.array
@@ -367,7 +364,7 @@ class Aorta(Segmentation):
             region_stats[f"{region}_length_mm"] = region_length
             # Region tortuosity
             region_centerline = self.centerline.coordinates[indices]
-            region_tortuosity, _ = calculate_tortuosity(region_centerline)
+            region_tortuosity = calculate_tortuosity(region_centerline)
             region_stats.update({f"{region}_{k}": v for k, v in region_tortuosity.items()})
             # Diameters and areas
             region_diameters = list(itemgetter(*indices)(self.cross_section_data))

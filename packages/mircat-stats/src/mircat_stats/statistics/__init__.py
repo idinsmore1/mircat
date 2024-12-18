@@ -138,12 +138,23 @@ def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bo
             ):
                 all_completed = True
         nifti.write_stats_to_file(all_stats, all_completed)
+        log_text = '\n'.join([
+            f"Stats Complete!",
+            f"\tOutput File: {nifti.output_file}",
+            f"\tComplete Stats: {all_completed}",
+            f"\tTimings:",
+            f"\t  Contrast Prediction: {contrast_time}s",
+            f"\t  Total Stats: {total_time}s",
+            f"\t  Aorta Stats: {aorta_time}s",
+            f"\t  Tissue Stats: {tissues_time}s"
+        ])
         logger.success(
-            f"Stats for {nifti}, complete: {all_completed}. \n\tContrast Pred Time: {contrast_time}s. Total Stats Time: {total_time}s. Aorta Stats Time: {aorta_time}s. Tissue Stats time: {tissues_time}s.\n\tStats file -> {nifti.output_file}\n",
+            # f"Stats out -> {nifti.output_file}complete: {all_completed}. \n\tContrast Pred Time: {contrast_time}s. Total Stats Time: {total_time}s. Aorta Stats Time: {aorta_time}s. Tissue Stats time: {tissues_time}s.\n",
+            log_text,
             extra={
                 "key": "statistics",
                 "input_nifti": str(nifti),
-                "completed": True,
+                "completed": all_completed,
                 "failed_reason": None,
                 "output_file": str(nifti.output_file),
                 "contrast_pred_time": contrast_time,
