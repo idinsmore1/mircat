@@ -204,7 +204,6 @@ stats_output_keys = [
     *[f"vertebrae_C{i}_midline" for i in range(7, 0, -1)],
     "aorta_length_mm",
     "aorta_tortuosity_index",
-    "aorta_soam",
     "aorta_periaortic_total_cm3",
     "aorta_periaortic_ring_cm3",
     "aorta_periaortic_fat_cm3",
