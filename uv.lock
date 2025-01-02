@@ -1101,7 +1101,7 @@ wheels = [
 
 [[package]]
 name = "mircat"
-version = "0.1.3"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "mircat-seg" },
@@ -1133,7 +1133,7 @@ requires-dist = [
 
 [[package]]
 name = "mircat-stats"
-version = "0.1.4.2"
+version = "1.0.0"
 source = { editable = "packages/mircat-stats" }
 dependencies = [
     { name = "cloud-files" },
@@ -2270,7 +2270,7 @@ name = "zstandard"
 version = "0.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "platform_python_implementation == 'PyPy' and python_full_version >= '3.10' and python_full_version < '3.12'" },
+    { name = "cffi", marker = "platform_python_implementation == 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ed/f6/2ac0287b442160a89d726b17a9184a4c615bb5237db763791a7fd16d9df1/zstandard-0.23.0.tar.gz", hash = "sha256:b2d8c62d08e7255f68f7a740bae85b3c9b8e5466baa9cbf7f57f1cde0ac6bc09", size = 681701 }
 wheels = [
