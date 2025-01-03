@@ -88,6 +88,7 @@ class MircatNifti:
             self._load_stats()
         else:
             self.stats_exist = False
+            self.stats = {}
         self._load_original_ct()
         self._check_seg_files(task_list)
         self._load_seg_arrays(task_list, gaussian)
