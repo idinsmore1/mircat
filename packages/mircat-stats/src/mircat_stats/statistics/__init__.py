@@ -109,7 +109,17 @@ def single_nifti_stats(input_nifti: str, task_list: list[str], mark_complete: bo
         if "aorta" in task_list:
             # gaussian flag here reloads the aorta segmentation with gaussian smoothing if it was not done
             # for all segmentations.
-            aorta_stats, aorta_time = calculate_aorta_stats(nifti)
+            if all_stats.get('contrast_completed', False):
+                pred = all_stats.get('contrast_pred')
+            elif nifti.stats.get('contrast_completed', False):
+                pred = nifti.stats.get('contrast_pred')
+            else:
+                pred = 'non_contrast'
+            if pred != 'non_contrast':
+                contrast = True
+            else:
+                contrast = False
+            aorta_stats, aorta_time = calculate_aorta_stats(nifti, contrast)
             all_stats["aorta_completed"] = True
             all_stats.update(aorta_stats)
 

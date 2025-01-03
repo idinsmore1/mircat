@@ -5,6 +5,7 @@ import pandas as pd
 from operator import itemgetter
 from loguru import logger
 from skimage import draw
+from scipy.ndimage import label
 from mircat_stats.configs.logging import timer
 from mircat_stats.statistics.centerline import Centerline, calculate_tortuosity
 from mircat_stats.statistics.cpr import StraightenedCPR
@@ -14,12 +15,14 @@ from mircat_stats.statistics.utils import _get_regions
 
 
 @timer
-def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
+def calculate_aorta_stats(nifti: MircatNifti, contrast: bool) -> dict[str, float]:
     """Calculate the statistics for the aorta in the segmentation.
     Parameters:
     -----------
     nifti : MircatNifti
-        The nifti obbject to calculate statistics for
+        The nifti object to calculate statistics for
+    contrast : bool
+        Whether the image is contrast-enhanced
     Returns:
     --------
     dict[str, float]
@@ -27,7 +30,7 @@ def calculate_aorta_stats(nifti: MircatNifti) -> dict[str, float]:
     """
     # Filter to the segmentations we need
     try:
-        aorta = Aorta(nifti)
+        aorta = Aorta(nifti, contrast)
         # Calculate the aorta statistics
         aorta_stats = aorta.measure_statistics()
         aorta.write_aorta_stats()
@@ -56,8 +59,9 @@ class Aorta(Segmentation):
     cross_section_resolution: float = 1.0
     root_length_mm: int = 20
 
-    def __init__(self, nifti: MircatNifti):
+    def __init__(self, nifti: MircatNifti, contrast: bool):
         super().__init__(nifti, ["aorta", "brachiocephalic_trunk", "subclavian_artery_left"])
+        self.contrast_enhanced = contrast
         self._make_SPR_numpy_array()
 
     #### INITIALIZATION OPERATIONS
@@ -94,10 +98,6 @@ class Aorta(Segmentation):
     def setup_stats(self):
         "Set up the aorta centerline and cprs for statistics"
         self._create_centerline()._create_cpr()._split_aorta_regions()
-        # if self.region_existence["thoracic"]["exists"]:
-        #     self._split_thoracic_regions()
-        # else:
-        #     self.thoracic_regions = {}
 
     def _create_centerline(self):
         "Create the centerline for the aorta"
@@ -142,9 +142,9 @@ class Aorta(Segmentation):
         # Split the centerline and cprs into the appropriate_regions
         aorta_regions = {}
         # Need at least T4 and T8 to capture enough of the thoracic aorta to be useful
-        thoracic = bool(self.vert_midlines.get("vertebrae_T4_midline", False) and self.vert_midlines.get("vertebrae_T8_midline", False))
+        thoracic = bool(self.vert_midlines.get("vertebrae_T4_midline") is not None and self.vert_midlines.get("vertebrae_T8_midline") is not None)
         # Need at least the T9 and T12 to capture enough of the descending aorta to be useful
-        descending = bool(self.vert_midlines.get("vertebrae_T9_midline", False) and self.vert_midlines.get("vertebrae_T12_midline", False))
+        descending = bool(self.vert_midlines.get("vertebrae_T9_midline") is not None and self.vert_midlines.get("vertebrae_T12_midline") is not None)
         if thoracic:
             start, end = self._find_aortic_region_endpoints("thoracic", self.vert_midlines)
             indices = self._get_region_indices(start, end)
@@ -153,11 +153,11 @@ class Aorta(Segmentation):
         elif descending:  # Only need to find descending if the full thoracic aorta is not present
             start, end = self._find_aortic_region_endpoints("descending", self.vert_midlines)
             indices = self._get_region_indices(start, end)
-            aorta_regions["descending"] = indices
+            aorta_regions["desc_aorta"] = indices
         # Upper abdominal aorta is between T12 and L2, but L1 will suffice for existence as it may be cut off
-        upper_abd = bool(self.vert_midlines.get('vertebrae_T12_midline', False) and self.vert_midlines.get('vertebrae_L1_midline', False))
+        upper_abd = bool(self.vert_midlines.get('vertebrae_T12_midline') is not None and self.vert_midlines.get('vertebrae_L1_midline') is not None)
         # Lower abdominal just needs L2 and L3- will check below when getting end points
-        lower_abd = bool(self.vert_midlines.get('vertebrae_L2_midline', False) and self.vert_midlines.get('vertebrae_L3_midline', False))
+        lower_abd = bool(self.vert_midlines.get('vertebrae_L2_midline') is not None and self.vert_midlines.get('vertebrae_L3_midline') is not None)
         if upper_abd:
             start, end = self._find_aortic_region_endpoints("upper_abd", self.vert_midlines)
             indices = self._get_region_indices(start, end)
@@ -263,14 +263,7 @@ class Aorta(Segmentation):
         """
         # Get the total aortic stats first
         aorta_stats = self._measure_whole_aorta()
-        # if self.thoracic_regions:
-        #     for region in self.thoracic_regions:
-        #         indices = self.thoracic_regions[region]
-        #         aorta_stats.update(self._measure_region(region, indices))
-        # elif self.region_existence["descending"]["exists"]:
-        #     aorta_stats.update(self._measure_region("", self.region_existence["descending"]["indices"]))
-        # if self.region_existence["abdominal"]["exists"]:
-        #     aorta_stats.update(self._measure_region("abd_aorta", self.region_existence["abdominal"]["indices"]))
+        # Measure the aorta regions   
         for region, indices in self.aorta_regions.items():
             aorta_stats.update(self._measure_region(region, indices))
         # Set the aorta stats
@@ -297,6 +290,16 @@ class Aorta(Segmentation):
         tortuosity = {f"aorta_{k}": v for k, v in tortuosity.items()}
         aorta_stats.update(tortuosity)
         # Measure diameters for each slice of the cpr
+        self._measure_all_cross_sections()
+        # Measure the periaortic fat
+        periaortic_stats = self._measure_total_periaortic_fat()
+        aorta_stats.update(periaortic_stats)
+        # Measure the total aortic calcification
+        calcification_stats = self._measure_total_aortic_calcification()
+        aorta_stats.update(calcification_stats)
+        return aorta_stats
+
+    def _measure_all_cross_sections(self):
         seg_cpr = self.seg_cpr.array
         cross_section_data = []
         for cross_section in seg_cpr:
@@ -305,16 +308,26 @@ class Aorta(Segmentation):
             )
             cross_section_data.append(cross_section_measures)
         self.cross_section_data = cross_section_data
-        # Create the periaortic fat array
+        return
+    
+    def _measure_total_periaortic_fat(self) -> dict[str, float]:
+        """Measure the periaortic fat for the aorta
+        Returns
+        -------
+        dict[str, float]
+            The periaortic fat statistics
+        """
+        periaortic_fat_stats = {}
+        seg_cpr = self.seg_cpr.array
+        cross_section_data = self.cross_section_data
         self._create_periaortic_arrays(cross_section_data)
-        # The cpr is always in (1, 1, 1) mm spacing, so the sum will be in mm^3
-        aorta_stats['aorta_periaortic_total_cm3'] = round((self.periaortic_mask_cpr.sum() + seg_cpr.sum()) / 1000, 1)
-        aorta_stats['aorta_periaortic_ring_cm3'] = round(self.periaortic_mask_cpr.sum() / 1000, 1)
-        aorta_stats['aorta_periaortic_fat_cm3'] = round(self.periaortic_fat_cpr.sum() / 1000, 1)
+        periaortic_fat_stats['aorta_periaortic_total_cm3'] = round((self.periaortic_mask_cpr.sum() + seg_cpr.sum()) / 1000, 1)
+        periaortic_fat_stats['aorta_periaortic_ring_cm3'] = round(self.periaortic_mask_cpr.sum() / 1000, 1)
+        periaortic_fat_stats['aorta_periaortic_fat_cm3'] = round(self.periaortic_fat_cpr.sum() / 1000, 1)
         fat_values = np.where(self.periaortic_fat_cpr == 1, self.original_cpr.array, np.nan)
-        aorta_stats['aorta_periaortic_fat_mean_hu'] = round(np.nanmean(fat_values), 1)
-        aorta_stats['aorta_periaortic_fat_stddev_hu'] = round(np.nanstd(fat_values), 1)
-        return aorta_stats
+        periaortic_fat_stats['aorta_periaortic_fat_mean_hu'] = round(np.nanmean(fat_values), 1)
+        periaortic_fat_stats['aorta_periaortic_fat_stddev_hu'] = round(np.nanstd(fat_values), 1)
+        return periaortic_fat_stats 
     
     def _create_periaortic_arrays(self, aortic_diameters: list[dict[str, float]]) -> np.ndarray:
         """Create the periaortic fat array for the aorta
@@ -351,6 +364,79 @@ class Aorta(Segmentation):
         self.periaortic_mask_cpr = periaortic_mask
         self.periaortic_fat_cpr = periaortic_fat
 
+    def _measure_total_aortic_calcification(self) -> dict[str, float]:
+        """Measure the calcification for the entire aorta found in the image
+        Returns
+        -------
+        dict[str, float]
+            The calcification statistics for the aorta
+        """
+        self._create_calcification_mask()
+        self._mark_calcifications()
+        # 
+        total_calcification = self.calcification_mask.sum()  # mm3 volume of calcification
+        if total_calcification > 0:
+            weighted_calc_score = total_calcification * np.mean(self.original_cpr.array[self.calcification_mask == 1]) # weighted by HU
+        else:
+            weighted_calc_score = None
+        calcification_stats = {}
+        calcification_stats['aorta_agatston_calcs'] = self.cpr_calcs.sum()
+        calcification_stats['aorta_agatston_score'] = self.cpr_agatstons.sum()
+        calcification_stats['aorta_calcification_mm3'] = total_calcification
+        calcification_stats['aorta_weighted_calc_score'] = weighted_calc_score
+        return calcification_stats
+
+    def _mark_calcifications(self) -> None:
+        """Track the calcifications in the aorta"""
+        slice_calcifications = []
+        slice_areas = []
+        slice_agatstons = []
+        min_volume = 1 # mm^3
+        for ct_slice, calc_slice in zip(self.original_cpr.array, self.calcification_mask):
+            labeled_array, _ = label(calc_slice)
+            unique_labels, areas = np.unique(labeled_array[labeled_array != 0], return_counts=True)
+            num_calcifications = np.sum(areas >= min_volume)
+            slice_agatston = 0
+            slice_area = 0
+            for label_, area in zip(unique_labels, areas):
+                if area >= min_volume:
+                    avg_hu = np.mean(ct_slice[labeled_array == label_])
+                    if 130 <= avg_hu < 200:
+                        factor = 1
+                    elif 200 <= avg_hu < 300:
+                        factor = 2
+                    elif 300 <= avg_hu < 400:
+                        factor = 3
+                    elif avg_hu >= 400:
+                        factor = 4
+                    else:
+                        factor = 0
+                    slice_agatston += area * factor
+                    slice_area += area
+            slice_calcifications.append(num_calcifications)
+            slice_areas.append(slice_area)
+            slice_agatstons.append(slice_agatston)
+        self.cpr_calcs = np.array(slice_calcifications, dtype=np.uint16)
+        self.cpr_calc_areas = np.array(slice_areas, dtype=np.uint64)
+        self.cpr_agatstons = np.array(slice_agatstons, dtype=np.uint64)
+
+                    
+    def _create_calcification_mask(self) -> np.ndarray:
+        """Create the calcification mask for the aorta
+        Returns
+        -------
+        np.ndarray
+            The array of masked calcifications
+        """
+        calcification_hu_threshold = 320 if self.contrast_enhanced else 130
+        seg = self.seg_cpr.array
+        aorta_only = (seg == 1).astype(np.uint8)  # Limit to only the aorta if it is thoracic
+        ct = self.original_cpr.array
+        calcification_mask = (ct >= calcification_hu_threshold).astype(np.uint8)
+        self.calcification_mask = calcification_mask * aorta_only
+        return calcification_mask
+
+
     def _measure_region(self, region: str, indices: list[int]) -> dict[str, float]:
         "Measure the statistics for a specific region of the aorta"
         region_stats = {}
@@ -378,26 +464,14 @@ class Aorta(Segmentation):
             # Periaortic fat
             fat_measures = self._extract_region_periaortic_fat(region, indices)
             region_stats.update(fat_measures)
+            # Calcification
+            calcification_stats = self._extract_region_calcification(region, indices)
+            region_stats.update(calcification_stats)
         except IndexError:
             logger.error(f"Index Error measuring {region} region in {self.path}")
         finally:
             return region_stats
-
-    def _extract_region_periaortic_fat(self, region, indices):
-        measures = {}
-        region_seg_cpr = self.seg_cpr.array[indices] 
-        region_ct_cpr = self.original_cpr.array[indices]
-        region_mask = self.periaortic_mask_cpr[indices]
-        region_fat = self.periaortic_fat_cpr[indices]
-        measures[f'{region}_periaortic_total_cm3'] = round((region_mask.sum() + region_seg_cpr.sum()) / 1000, 1)
-        measures[f"{region}_periaortic_ring_cm3"] = round(region_mask.sum() / 1000, 1)
-        measures[f"{region}_periaortic_fat_cm3"] = round(region_fat.sum() / 1000, 1)
-        # Calculate the average intensity and standard deviation of the fat
-        fat_values = np.where(region_fat == 1, region_ct_cpr, np.nan)
-        measures[f'{region}_periaortic_fat_mean_hu'] = round(np.nanmean(fat_values), 1)
-        measures[f'{region}_periaortic_fat_stddev_hu'] = round(np.nanstd(fat_values), 1)
-        return measures
-
+    
     def _extract_region_diameters(self, region_diameters: list[str, dict]) -> tuple[dict[str, float], int]:
         """Measure the maximum, proximal, mid, and distal diameters of the aortic region
         Parameters
@@ -448,6 +522,38 @@ class Aorta(Segmentation):
             max_ = {}
             largest_idx = None
         return {**max_, **proximal, **mid, **distal}, largest_idx 
+
+    def _extract_region_periaortic_fat(self, region, indices) -> dict[str, float]:
+        measures = {}
+        region_seg_cpr = self.seg_cpr.array[indices] 
+        region_ct_cpr = self.original_cpr.array[indices]
+        region_mask = self.periaortic_mask_cpr[indices]
+        region_fat = self.periaortic_fat_cpr[indices]
+        measures[f'{region}_periaortic_total_cm3'] = round((region_mask.sum() + region_seg_cpr.sum()) / 1000, 1)
+        measures[f"{region}_periaortic_ring_cm3"] = round(region_mask.sum() / 1000, 1)
+        measures[f"{region}_periaortic_fat_cm3"] = round(region_fat.sum() / 1000, 1)
+        # Calculate the average intensity and standard deviation of the fat
+        fat_values = np.where(region_fat == 1, region_ct_cpr, np.nan)
+        measures[f'{region}_periaortic_fat_mean_hu'] = round(np.nanmean(fat_values), 1)
+        measures[f'{region}_periaortic_fat_stddev_hu'] = round(np.nanstd(fat_values), 1)
+        return measures
+
+    def _extract_region_calcification(self, region, indices) -> dict[str, float]:
+        measures = {}
+        region_calc_cpr = self.calcification_mask[indices]
+        region_ct_cpr = self.original_cpr.array[indices]
+        region_calcs = self.cpr_calcs[indices]
+        region_agatstons = self.cpr_agatstons[indices]
+        measures[f"{region}_agatston_calcs"] = region_calcs.sum()
+        measures[f"{region}_agatston_score"] = region_agatstons.sum()
+        total_calcification = region_calc_cpr.sum()  # mm3 volume of calcification
+        if total_calcification > 0:
+            weighted_calc_score = total_calcification * np.mean(region_ct_cpr[region_calc_cpr == 1]) # weighted by HU
+        else:
+            weighted_calc_score = None
+        measures[f"{region}_calcification_mm3"] = total_calcification
+        measures[f"{region}_weighted_calc_score"] = weighted_calc_score
+        return measures
     
     #### Write the statistics to a csv file
     def write_aorta_stats(self) -> None:
@@ -478,6 +584,9 @@ class Aorta(Segmentation):
         areas = [d.get('area') for d in self.cross_section_data]
         flatnesses = [d.get('flatness') for d in self.cross_section_data]
         roundnesses = [d.get('roundness') for d in self.cross_section_data]
+        calcs = self.cpr_calcs.tolist()
+        calc_areas = self.cpr_calc_areas.tolist()
+        agatstons = self.cpr_agatstons.tolist()
         # total_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[0].tolist()], None, None, None]
         # in_plane_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[1].tolist()], None, None, None]
         # torsional_angles = [0, *[round(x, 2) for x in self.angles_of_centerline[2].tolist()], None, None, None]
@@ -496,9 +605,9 @@ class Aorta(Segmentation):
                 "minor_axis": minor_axes,
                 "flatness": flatnesses,
                 "roundness": roundnesses,
-                # "total_angle": total_angles,
-                # "in_plane_angle": in_plane_angles,
-                # "torsional_angle": torsional_angles,
+                "calcifications": calcs,
+                "calcification_area": calc_areas,
+                "agatston_score": agatstons,
             },
         )
 

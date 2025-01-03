@@ -24,6 +24,10 @@ aorta_region_columns = [
     "periaortic_fat_cm3",
     "periaortic_fat_mean_hu",
     "periaortic_fat_stddev_hu",
+    "agatston_calcs",
+    "agatston_score",
+    "calcification_mm3",
+    "weighted_calc_score"
 ]
 stats_output_keys = [
     "nifti_path",
@@ -199,7 +203,6 @@ stats_output_keys = [
     "iliac_vena_right_average_intensity",
     "vertebrae_S1_midline",
     *[f"vertebrae_L{i}_midline" for i in range(5, 0, -1)],
-    "vertebrae_T12L1_midline",  # This is a special case for between the T12 and L1 for determining abdominal aorta size
     *[f"vertebrae_T{i}_midline" for i in range(12, 0, -1)],
     *[f"vertebrae_C{i}_midline" for i in range(7, 0, -1)],
     "aorta_length_mm",
@@ -209,6 +212,10 @@ stats_output_keys = [
     "aorta_periaortic_fat_cm3",
     "aorta_periaortic_fat_mean_hu",
     "aorta_periaortic_fat_stddev_hu",
+    "aorta_agatston_calcs",
+    "aorta_agatston_score",
+    "aorta_calcification_mm3",
+    "aorta_weighted_calc_score",
     *[f"asc_aorta_{diam}" for diam in aorta_region_columns],
     *[f"aortic_arch_{diam}" for diam in aorta_region_columns],
     *[f"desc_aorta_{diam}" for diam in aorta_region_columns],
